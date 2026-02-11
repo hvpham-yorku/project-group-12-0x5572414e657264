@@ -4,4 +4,5 @@
 
 ## Work Entries:
 
-- 15:45-
+- Writing Vision Statement 15:45-18:00
+  - 2h 15min
