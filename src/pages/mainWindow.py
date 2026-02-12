@@ -33,9 +33,9 @@ def mainWindow(tag: str):
                 dpg.add_table_column()
 
                 with dpg.table_row():
-                    with dpg.table_cell():  # LEFT PANEL
-                        with dpg.child_window(border=True):
-                            dpg.add_text("Camera Feed")
+                    with dpg.table_cell(tag="cameraFeedCell"):  # LEFT PANEL
+                        # with dpg.child_window(border=True):
+                        #     dpg.add_text("Camera Feed")
                         cameraFeed.create_camera_feed_window()
                     with dpg.table_cell():  # RIGHT PANEL
                         with dpg.child_window(border=True):

@@ -35,11 +35,23 @@ def create_camera_feed_window() -> None:
     if dpg.does_item_exist(CAMERA_FEED_WINDOW_TAG):
         return
 
-    with dpg.window(
+    # with dpg.window(
+    #     label="Live Camera Feed",
+    #     tag=CAMERA_FEED_WINDOW_TAG,
+    #     width=FRAME_WIDTH + 40,
+    #     height=FRAME_HEIGHT + 110,
+    # ):
+    #     dpg.add_text(
+    #         default_value=_status_message, tag=CAMERA_FEED_STATUS_TAG, wrap=FRAME_WIDTH
+    #     )
+    #     dpg.add_separator()
+    #     dpg.add_image(CAMERA_FEED_TEXTURE_TAG, width=FRAME_WIDTH, height=FRAME_HEIGHT)
+    with dpg.child_window(
         label="Live Camera Feed",
         tag=CAMERA_FEED_WINDOW_TAG,
-        width=FRAME_WIDTH + 40,
-        height=FRAME_HEIGHT + 110,
+        parent="cameraFeedCell",
+        # width=FRAME_WIDTH,
+        # height=FRAME_HEIGHT,
     ):
         dpg.add_text(
             default_value=_status_message, tag=CAMERA_FEED_STATUS_TAG, wrap=FRAME_WIDTH
