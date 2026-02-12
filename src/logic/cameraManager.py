@@ -1,3 +1,9 @@
+"""
+Docstring for logic.cameraManager
+
+This file contains the camera manager to manage live feed
+"""
+
 import threading
 import cv2
 
@@ -8,6 +14,10 @@ from src.config.config import TRACK_UPDATE_SECONDS
 
 
 class CameraManager:
+    """
+    Docstring for CameraManager
+    """
+
     def __init__(self):
         self.capture = None
         self.camera_index = None
