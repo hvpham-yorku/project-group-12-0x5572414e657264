@@ -23,7 +23,14 @@ class CameraManager:
         self.camera_index = None
         self.lock = threading.Lock()
 
-    def list_cameras(self, max_index=MAX_CAMERAS):
+    def list_cameras(self, max_index: int = MAX_CAMERAS):
+        """
+        Docstring for list_cameras
+
+        :param self:
+        :param max_index: The max number of cameras to list/consider
+        :type max_index: int
+        """
         available = []
         for index in range(max_index):
             cap = cv2.VideoCapture(index)
