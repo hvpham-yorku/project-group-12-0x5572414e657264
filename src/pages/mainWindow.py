@@ -1,8 +1,8 @@
 import dearpygui.dearpygui as dpg
 from src.themes.themes import *
+from src.pages import cameraFeed
 
-
-TOP_RATIO = 0.35  # top row = 35% of viewport height
+TOP_RATIO = 0.75  # top row = 35% of viewport height
 GAP = 0  # optional spacing between rows (px)
 
 
@@ -25,14 +25,8 @@ def mainWindow(tag: str):
     dpg.set_viewport_resize_callback(on_resize)  # does automatic reflow
 
     with dpg.window(tag=tag):
-        # dpg.add_text("Main Content")
-        # with dpg.child_window(
-        #     width=-1,  # -1 = fill parent width
-        #     height=-1,  # -1 = fill parent height
-        #     border=True,
-        # ):
-        #     dpg.add_text("This fills the parent")
-        # dpg.add_spacer(height=15)
+
+        # TOP
         with dpg.child_window(tag="top_row", width=-1, height=450, border=True):
             with dpg.table(resizable=True, policy=dpg.mvTable_SizingStretchProp):
                 dpg.add_table_column()
@@ -42,21 +36,10 @@ def mainWindow(tag: str):
                     with dpg.table_cell():  # LEFT PANEL
                         with dpg.child_window(border=True):
                             dpg.add_text("Camera Feed")
+                        cameraFeed.create_camera_feed_window()
                     with dpg.table_cell():  # RIGHT PANEL
                         with dpg.child_window(border=True):
                             dpg.add_text("Import Data")
-        with dpg.child_window(tag="bottom_row", width=-1, height=300, border=True):
+        # BOTTOM
+        with dpg.child_window(tag="bottom_row", width=-1, height=-1, border=True):
             dpg.add_text("Logs")
-        # with dpg.group(horizontal=False):
-
-        #     # Top panel
-
-        #     with dpg.group(height=300, horizontal=True):
-        #         with dpg.child_window(width=400, height=300, border=True):
-        #             dpg.add_text("Live Feed")
-        #         with dpg.child_window(width=-1, height=300, border=True):
-        #             dpg.add_text("Import Data")
-
-        #     # Bottom panel log window
-        #     with dpg.child_window(width=-1, height=-1, border=True):
-        #         dpg.add_text("Logs")

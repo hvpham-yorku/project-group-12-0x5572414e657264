@@ -3,6 +3,7 @@ import dearpygui.dearpygui as dpg
 from src.themes import themes
 from src.pages import mainWindow
 from src.pages import menuBar
+from src.pages import cameraFeed
 
 
 def main():
@@ -12,6 +13,9 @@ def main():
 
     # Set up the viewport
     dpg.create_viewport(title="StoreFlow Analytics", width=1300, height=800)
+
+    # Initializes camera feed window
+    # cameraFeed.create_camera_feed_window()
 
     # Initializes the pages
     menuBar.menuBar()
@@ -24,11 +28,14 @@ def main():
     dpg.setup_dearpygui()
     dpg.show_viewport()
 
-    # Run the application
-    dpg.start_dearpygui()
-
-    # Clean up
-    dpg.destroy_context()
+    try:
+        # Run the application while updating the live camera feed.
+        while dpg.is_dearpygui_running():
+            cameraFeed.update_camera_feed()
+            dpg.render_dearpygui_frame()
+    finally:
+        cameraFeed.shutdown_camera_feed()
+        dpg.destroy_context()
 
 
 if __name__ == "__main__":
