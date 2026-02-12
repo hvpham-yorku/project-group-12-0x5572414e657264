@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
 
-import themes.themes as themes
-import pages.menuBar as menuBar
+from src.themes import themes
+from src.pages import menuBar
 
 
 def main():

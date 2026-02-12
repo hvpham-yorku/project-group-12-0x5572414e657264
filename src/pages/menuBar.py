@@ -1,6 +1,7 @@
 import dearpygui.dearpygui as dpg
 from datetime import datetime
-from ..themes.themes import *
+
+from src.themes.themes import *
 
 
 def print_me(sender):
