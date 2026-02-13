@@ -28,7 +28,7 @@ def addLog(severityLevel: int, message: str) -> None:
     """
     Docstring for addLog
 
-    :param severityLevel: the smaller the number, the more severe
+    :param severityLevel: the bigger the number, the more severe
     :type severityLevel: int
     :param message: string messsage to display
     :type message: str

@@ -2,12 +2,14 @@ import dearpygui.dearpygui as dpg
 
 from src.themes.themes import *
 from src.pages import cameraFeed
+from src.pages import logWindow
 
 CAMERA_SELECT_MENU_TAG = "camera_select_menu"
 
 
 def print_me(sender):
     print(f"Menu Item: {sender}")
+    logWindow.addLog(0, "THIS FEATURE IS NOT YET IMPLEMENTED")
 
 
 def set_dark(sender):
@@ -29,10 +31,12 @@ def set_retro(sender):
 def select_camera(sender, app_data, user_data):
     camera_index = int(user_data)
     cameraFeed.select_camera(camera_index)
+    logWindow.addLog(0, f"CAMERA {user_data} WAS SELECTED")
     refresh_camera_list()
 
 
 def refresh_camera_list(sender=None, app_data=None, user_data=None):
+    logWindow.addLog(0, "REFRESHING CAMERA LIST")
     if not dpg.does_item_exist(CAMERA_SELECT_MENU_TAG):
         return
 

@@ -30,18 +30,22 @@ def mainWindow(tag: str):
 
         # TOP
         with dpg.child_window(tag="top_row", width=-1, height=450, border=True):
-            with dpg.table(resizable=True, policy=dpg.mvTable_SizingStretchProp):
-                dpg.add_table_column()
-                dpg.add_table_column()
-
-                with dpg.table_row():
-                    with dpg.table_cell(tag="cameraFeedCell"):  # LEFT PANEL
-                        # with dpg.child_window(border=True):
-                        #     dpg.add_text("Camera Feed")
-                        cameraFeed.create_camera_feed_window()
-                    with dpg.table_cell(tag="posDataCell"):  # RIGHT PANEL
-                        salesDataWindow.create_sales_data_window("posDataCell")
+            pass
         # BOTTOM
         with dpg.child_window(tag="bottom_row", width=-1, height=-1, border=True):
             dpg.add_text("Logs")
             logWindow.createWindow("bottom_row")
+
+        with dpg.table(
+            parent="top_row", resizable=True, policy=dpg.mvTable_SizingStretchProp
+        ):
+            dpg.add_table_column()
+            dpg.add_table_column()
+
+            with dpg.table_row():
+                with dpg.table_cell(tag="cameraFeedCell"):  # LEFT PANEL
+                    # with dpg.child_window(border=True):
+                    #     dpg.add_text("Camera Feed")
+                    cameraFeed.create_camera_feed_window()
+                with dpg.table_cell(tag="posDataCell"):  # RIGHT PANEL
+                    salesDataWindow.create_sales_data_window("posDataCell")

@@ -18,8 +18,8 @@ def main():
     # cameraFeed.create_camera_feed_window()
 
     # Initializes the pages
-    menuBar.menuBar()
     mainWindow.mainWindow("main_window")
+    menuBar.menuBar()
 
     # sets which window is the primary window
     dpg.set_primary_window("main_window", True)

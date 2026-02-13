@@ -8,6 +8,7 @@ import numpy as np
 
 from src.config.config import FRAME_HEIGHT, FRAME_WIDTH
 from src.logic.cameraManager import CameraDevice, CameraManager
+from src.pages import logWindow
 
 CAMERA_FEED_TEXTURE_REGISTRY_TAG = "camera_feed_texture_registry"
 CAMERA_FEED_TEXTURE_TAG = "camera_feed_texture"
@@ -91,6 +92,10 @@ def toggle_camera_feed_window(sender, app_data, user_data) -> None:
         return
 
     dpg.configure_item(CAMERA_FEED_WINDOW_TAG, show=bool(app_data))
+    if bool(app_data):
+        logWindow.addLog(0, f"CAMERA WAS ENABLED")
+    else:
+        logWindow.addLog(0, f"CAMERA WAS DISABLED")
 
 
 def update_camera_feed() -> None:
