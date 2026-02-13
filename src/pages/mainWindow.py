@@ -2,6 +2,7 @@ import dearpygui.dearpygui as dpg
 from src.themes.themes import *
 from src.pages import cameraFeed
 from src.pages import salesDataWindow
+from src.pages import logWindow
 
 TOP_RATIO = 0.75  # top row = 35% of viewport height
 GAP = 0  # optional spacing between rows (px)
@@ -43,3 +44,4 @@ def mainWindow(tag: str):
         # BOTTOM
         with dpg.child_window(tag="bottom_row", width=-1, height=-1, border=True):
             dpg.add_text("Logs")
+            logWindow.createWindow("bottom_row")
