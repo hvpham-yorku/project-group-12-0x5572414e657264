@@ -1,3 +1,4 @@
 dearpygui
 opencv-python
 numpy
+PyInstaller 
