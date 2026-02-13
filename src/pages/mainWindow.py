@@ -1,6 +1,7 @@
 import dearpygui.dearpygui as dpg
 from src.themes.themes import *
 from src.pages import cameraFeed
+from src.pages import salesDataWindow
 
 TOP_RATIO = 0.75  # top row = 35% of viewport height
 GAP = 0  # optional spacing between rows (px)
@@ -37,9 +38,8 @@ def mainWindow(tag: str):
                         # with dpg.child_window(border=True):
                         #     dpg.add_text("Camera Feed")
                         cameraFeed.create_camera_feed_window()
-                    with dpg.table_cell():  # RIGHT PANEL
-                        with dpg.child_window(border=True):
-                            dpg.add_text("Import Data")
+                    with dpg.table_cell(tag="posDataCell"):  # RIGHT PANEL
+                        salesDataWindow.create_sales_data_window("posDataCell")
         # BOTTOM
         with dpg.child_window(tag="bottom_row", width=-1, height=-1, border=True):
             dpg.add_text("Logs")
