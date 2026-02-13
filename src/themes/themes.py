@@ -261,53 +261,33 @@ def create_theme_dark() -> Union[str, int]:
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
-                dpg.mvPlotCol_XAxis,
+                dpg.mvPlotCol_AxisBg,
+                (0.00 * 255, 0.00 * 255, 0.00 * 255, 0.00 * 255),
+                category=dpg.mvThemeCat_Plots,
+            )
+            dpg.add_theme_color(
+                dpg.mvPlotCol_AxisBgActive,
+                (0.06 * 255, 0.53 * 255, 0.98 * 255, 1.00 * 255),
+                category=dpg.mvThemeCat_Plots,
+            )
+            dpg.add_theme_color(
+                dpg.mvPlotCol_AxisBgHovered,
+                (0.26 * 255, 0.59 * 255, 0.98 * 255, 1.00 * 255),
+                category=dpg.mvThemeCat_Plots,
+            )
+            dpg.add_theme_color(
+                dpg.mvPlotCol_AxisGrid,
                 (1.00 * 255, 1.00 * 255, 1.00 * 255, 1.00 * 255),
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
-                dpg.mvPlotCol_XAxisGrid,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 0.25 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxis,
+                dpg.mvPlotCol_AxisText,
                 (1.00 * 255, 1.00 * 255, 1.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxisGrid,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 0.25 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxis2,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxisGrid2,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 0.25 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxis3,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxisGrid3,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 0.25 * 255),
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
                 dpg.mvPlotCol_Selection,
                 (1.00 * 255, 0.60 * 255, 0.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_Query,
-                (0.00 * 255, 1.00 * 255, 0.44 * 255, 1.00 * 255),
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
@@ -651,53 +631,33 @@ def create_theme_light() -> Union[str, int]:
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
-                dpg.mvPlotCol_XAxis,
+                dpg.mvPlotCol_AxisBg,
+                (0.00 * 255, 0.00 * 255, 0.00 * 255, 0.00 * 255),
+                category=dpg.mvThemeCat_Plots,
+            )
+            dpg.add_theme_color(
+                dpg.mvPlotCol_AxisBgActive,
+                (0.06 * 255, 0.53 * 255, 0.98 * 255, 1.00 * 255),
+                category=dpg.mvThemeCat_Plots,
+            )
+            dpg.add_theme_color(
+                dpg.mvPlotCol_AxisBgHovered,
+                (0.26 * 255, 0.59 * 255, 0.98 * 255, 1.00 * 255),
+                category=dpg.mvThemeCat_Plots,
+            )
+            dpg.add_theme_color(
+                dpg.mvPlotCol_AxisGrid,
                 (0.00 * 255, 0.00 * 255, 0.00 * 255, 1.00 * 255),
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
-                dpg.mvPlotCol_XAxisGrid,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxis,
+                dpg.mvPlotCol_AxisText,
                 (0.00 * 255, 0.00 * 255, 0.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxisGrid,
-                (1.00 * 255, 1.00 * 255, 1.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxis2,
-                (0.00 * 255, 0.00 * 255, 0.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxisGrid2,
-                (0.00 * 255, 0.00 * 255, 0.00 * 255, 0.50 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxis3,
-                (0.00 * 255, 0.00 * 255, 0.00 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_YAxisGrid3,
-                (0.00 * 255, 0.00 * 255, 0.00 * 255, 0.50 * 255),
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(
                 dpg.mvPlotCol_Selection,
                 (0.82 * 255, 0.64 * 255, 0.03 * 255, 1.00 * 255),
-                category=dpg.mvThemeCat_Plots,
-            )
-            dpg.add_theme_color(
-                dpg.mvPlotCol_Query,
-                (0.00 * 255, 0.84 * 255, 0.37 * 255, 1.00 * 255),
                 category=dpg.mvThemeCat_Plots,
             )
             dpg.add_theme_color(

@@ -73,10 +73,10 @@ def menuBar():
 
         with dpg.menu(label="View"):
             with dpg.menu(label="Themes"):
-                dpg.add_menu_item(label="dark", callback=set_dark)
-                dpg.add_menu_item(label="light", callback=set_light)
-                dpg.add_menu_item(label="green accent", callback=set_default_theme)
-                dpg.add_menu_item(label="retro?", callback=set_retro)
+                dpg.add_menu_item(label="Dark", callback=set_dark)
+                dpg.add_menu_item(label="Light", callback=set_light)
+                dpg.add_menu_item(label="Default", callback=set_default_theme)
+                dpg.add_menu_item(label="Retro", callback=set_retro)
 
         with dpg.menu(label="Camera"):
             dpg.add_menu_item(
