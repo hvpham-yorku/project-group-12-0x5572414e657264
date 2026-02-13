@@ -1,5 +1,3 @@
-# TODO REFACTOR THIS INTO IT'S OWN CLASS
-
 from __future__ import annotations
 
 from typing import List

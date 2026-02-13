@@ -1,4 +1,4 @@
-# TODO Refactor into own class
+# TODO Refactor into own class maybe?
 
 import dearpygui.dearpygui as dpg
 
