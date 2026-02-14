@@ -1,3 +1,8 @@
+"""
+database model classes, so they can easily be used and integrate into the core logic
+"""
+
+
 from dataclasses import dataclass
 from datetime import datetime
 
