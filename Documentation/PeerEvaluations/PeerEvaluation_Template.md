@@ -21,6 +21,6 @@ Our team functioned with perfect synergy. Everyone was fully involved, communica
 
 *By signing below, we agree that this assessment accurately reflects our team dynamics and work distribution.*
 
-* **[Ryan]:** _______________________ **(Signed electronically)**
-* **[Mani]:** _______________________ **(Signed electronically)** 
-* **[Jeduson]:** _______________________ **(Signed electronically)**
+* **[Ryan]:** Ryan **(Signed electronically)**
+* **[Mani]:** Mani **(Signed electronically)** 
+* **[Jeduson]:** Jeduson **(Signed electronically)**
