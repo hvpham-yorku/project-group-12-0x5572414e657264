@@ -1,0 +1,9 @@
+Team Number: Group 12
+Team Name: StoreFlow Analytics
+Member 1: Jeduson Kawleswaran - 220 698 403
+Member 2: Ryan Pelchat - 218 431 957
+Member 3: Mani Fatemi - 221 243 621
+GithubLink: https://github.com/hvpham-yorku/project-group-12-0x5572414e657264
+GithubITR0: https://github.com/hvpham-yorku/project-group-12-0x5572414e657264/releases/tag/IRR0
+GithubITR1: https://github.com/hvpham-yorku/project-group-12-0x5572414e657264/releases/tag/IRR1
+VideoLink: https://youtu.be/F5pui8nAKh4
