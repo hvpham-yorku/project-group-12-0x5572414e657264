@@ -70,11 +70,17 @@ class TestCustomerManager(DBTestCase):
     def test_add_customer(self):
         store = self._make_store()
         now = datetime(2026, 1, 1, 12, 0, 0)
-        cust = mm.add_customer(Customer(store_id=store.store_id, entered_at=now))
+        cust = mm.add_customer(Customer(
+            store_id=store.store_id, entered_at=now,
+            age=30, sex="male", race="asian",
+        ))
         self.assertGreater(cust.customer_id, 0)
         self.assertEqual(cust.store_id, store.store_id)
         self.assertEqual(cust.entered_at, now)
         self.assertIsNone(cust.exited_at)
+        self.assertEqual(cust.age, 30)
+        self.assertEqual(cust.sex, "male")
+        self.assertEqual(cust.race, "asian")
 
     def test_get_customer_by_id(self):
         store = self._make_store()
@@ -96,12 +102,15 @@ class TestCustomerManager(DBTestCase):
 
     def test_update_customer(self):
         store = self._make_store()
-        created = mm.add_customer(Customer(store_id=store.store_id))
+        created = mm.add_customer(Customer(store_id=store.store_id, age=25, sex="female", race="white"))
         exit_time = datetime(2026, 1, 1, 13, 0, 0)
         updated = mm.update_customer(
-            Customer(customer_id=created.customer_id, store_id=store.store_id, exited_at=exit_time)
+            Customer(customer_id=created.customer_id, store_id=store.store_id, exited_at=exit_time, age=26, sex="female", race="white")
         )
         self.assertEqual(updated.exited_at, exit_time)
+        self.assertEqual(updated.age, 26)
+        self.assertEqual(updated.sex, "female")
+        self.assertEqual(updated.race, "white")
 
     def test_delete_customer(self):
         store = self._make_store()
@@ -120,9 +129,17 @@ class TestAisleManager(DBTestCase):
 
     def test_add_aisle(self):
         store = self._make_store()
-        aisle = mm.add_aisle(Aisle(store_id=store.store_id))
+        aisle = mm.add_aisle(Aisle(
+            store_id=store.store_id,
+            bottom_left_x=10, bottom_left_y=20,
+            top_right_x=100, top_right_y=200,
+        ))
         self.assertGreater(aisle.aisle_id, 0)
         self.assertEqual(aisle.store_id, store.store_id)
+        self.assertEqual(aisle.bottom_left_x, 10)
+        self.assertEqual(aisle.bottom_left_y, 20)
+        self.assertEqual(aisle.top_right_x, 100)
+        self.assertEqual(aisle.top_right_y, 200)
 
     def test_get_aisle_by_id(self):
         store = self._make_store()
@@ -144,9 +161,17 @@ class TestAisleManager(DBTestCase):
     def test_update_aisle(self):
         s1 = self._make_store()
         s2 = mm.add_store(Store(name="S2", owner="O2"))
-        created = mm.add_aisle(Aisle(store_id=s1.store_id))
-        updated = mm.update_aisle(Aisle(aisle_id=created.aisle_id, store_id=s2.store_id))
+        created = mm.add_aisle(Aisle(store_id=s1.store_id, bottom_left_x=0, bottom_left_y=0, top_right_x=0, top_right_y=0))
+        updated = mm.update_aisle(Aisle(
+            aisle_id=created.aisle_id, store_id=s2.store_id,
+            bottom_left_x=5, bottom_left_y=15,
+            top_right_x=50, top_right_y=150,
+        ))
         self.assertEqual(updated.store_id, s2.store_id)
+        self.assertEqual(updated.bottom_left_x, 5)
+        self.assertEqual(updated.bottom_left_y, 15)
+        self.assertEqual(updated.top_right_x, 50)
+        self.assertEqual(updated.top_right_y, 150)
 
     def test_delete_aisle(self):
         store = self._make_store()
@@ -167,10 +192,11 @@ class TestProductManager(DBTestCase):
 
     def test_add_product(self):
         store, aisle = self._make_dependencies()
-        prod = mm.add_product(Product(store_id=store.store_id, aisle_id=aisle.aisle_id, name="Milk", price=3.99))
+        prod = mm.add_product(Product(store_id=store.store_id, aisle_id=aisle.aisle_id, name="Milk", price=3.99, order=2))
         self.assertGreater(prod.product_id, 0)
         self.assertEqual(prod.name, "Milk")
         self.assertAlmostEqual(prod.price, 3.99)
+        self.assertEqual(prod.order, 2)
 
     def test_get_product_by_id(self):
         store, aisle = self._make_dependencies()
@@ -196,12 +222,13 @@ class TestProductManager(DBTestCase):
 
     def test_update_product(self):
         store, aisle = self._make_dependencies()
-        created = mm.add_product(Product(store_id=store.store_id, aisle_id=aisle.aisle_id, name="Old", price=1.0))
+        created = mm.add_product(Product(store_id=store.store_id, aisle_id=aisle.aisle_id, name="Old", price=1.0, order=1))
         updated = mm.update_product(
-            Product(product_id=created.product_id, store_id=store.store_id, aisle_id=aisle.aisle_id, name="New", price=5.0)
+            Product(product_id=created.product_id, store_id=store.store_id, aisle_id=aisle.aisle_id, name="New", price=5.0, order=3)
         )
         self.assertEqual(updated.name, "New")
         self.assertAlmostEqual(updated.price, 5.0)
+        self.assertEqual(updated.order, 3)
 
     def test_delete_product(self):
         store, aisle = self._make_dependencies()
@@ -220,14 +247,13 @@ class TestCameraManager(DBTestCase):
 
     def test_add_camera(self):
         store = self._make_store()
-        cam = mm.add_camera(Camera(store_id=store.store_id, location_x=10, location_y=20))
+        cam = mm.add_camera(Camera(store_id=store.store_id))
         self.assertGreater(cam.camera_id, 0)
-        self.assertEqual(cam.location_x, 10)
-        self.assertEqual(cam.location_y, 20)
+        self.assertEqual(cam.store_id, store.store_id)
 
     def test_get_camera_by_id(self):
         store = self._make_store()
-        created = mm.add_camera(Camera(store_id=store.store_id, location_x=5, location_y=5))
+        created = mm.add_camera(Camera(store_id=store.store_id))
         self.assertEqual(mm.get_camera_by_id(created.camera_id), created)
 
     def test_get_camera_by_id_not_found(self):
@@ -236,24 +262,24 @@ class TestCameraManager(DBTestCase):
     def test_get_cameras_by_store(self):
         s1 = self._make_store()
         s2 = mm.add_store(Store(name="S2", owner="O2"))
-        mm.add_camera(Camera(store_id=s1.store_id, location_x=0, location_y=0))
-        mm.add_camera(Camera(store_id=s1.store_id, location_x=1, location_y=1))
-        mm.add_camera(Camera(store_id=s2.store_id, location_x=2, location_y=2))
+        mm.add_camera(Camera(store_id=s1.store_id))
+        mm.add_camera(Camera(store_id=s1.store_id))
+        mm.add_camera(Camera(store_id=s2.store_id))
         self.assertEqual(len(mm.get_cameras_by_store(s1.store_id)), 2)
         self.assertEqual(len(mm.get_cameras_by_store(s2.store_id)), 1)
 
     def test_update_camera(self):
-        store = self._make_store()
-        created = mm.add_camera(Camera(store_id=store.store_id, location_x=0, location_y=0))
+        s1 = self._make_store()
+        s2 = mm.add_store(Store(name="S2", owner="O2"))
+        created = mm.add_camera(Camera(store_id=s1.store_id))
         updated = mm.update_camera(
-            Camera(camera_id=created.camera_id, store_id=store.store_id, location_x=99, location_y=88)
+            Camera(camera_id=created.camera_id, store_id=s2.store_id)
         )
-        self.assertEqual(updated.location_x, 99)
-        self.assertEqual(updated.location_y, 88)
+        self.assertEqual(updated.store_id, s2.store_id)
 
     def test_delete_camera(self):
         store = self._make_store()
-        created = mm.add_camera(Camera(store_id=store.store_id, location_x=0, location_y=0))
+        created = mm.add_camera(Camera(store_id=store.store_id))
         self.assertTrue(mm.delete_camera(created.camera_id))
         self.assertIsNone(mm.get_camera_by_id(created.camera_id))
 
