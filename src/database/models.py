@@ -47,6 +47,7 @@ class Product:
     aisle_id: int = -1
     name: str = ""
     price: float = 0.0
+    order: int = 0
 
 
 @dataclass
@@ -55,20 +56,25 @@ class Customer:
     entered_at: datetime = None
     exited_at: datetime = None
     store_id: int = -1
+    age: int = -1
+    sex: str = ""
+    race: str = ""
 
 
 @dataclass
 class Aisle:
     aisle_id: int = -1
     store_id: int = -1
+    bottom_left_x: int = 0
+    bottom_left_y: int = 0
+    top_right_x: int = 0
+    top_right_y: int = 0
 
 
 @dataclass
 class Camera:
     camera_id: int = -1
     store_id: int = -1
-    location_x: int = 0
-    location_y: int = 0
 
 
 @dataclass

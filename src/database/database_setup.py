@@ -44,6 +44,9 @@ class CustomerTable(BaseTable):
     entered_at = pw.DateTimeField(null=True, default=None)
     exited_at = pw.DateTimeField(null=True, default=None)
     store_id = pw.IntegerField()
+    age = pw.IntegerField(default=-1)
+    sex = pw.CharField(max_length=255, default="")
+    race = pw.CharField(max_length=255, default="")
 
     class Meta:
         table_name = "customer"
@@ -52,6 +55,10 @@ class CustomerTable(BaseTable):
 class AisleTable(BaseTable):
     aisle_id = pw.AutoField()
     store_id = pw.IntegerField()
+    bottom_left_x = pw.IntegerField(default=0)
+    bottom_left_y = pw.IntegerField(default=0)
+    top_right_x = pw.IntegerField(default=0)
+    top_right_y = pw.IntegerField(default=0)
 
     class Meta:
         table_name = "aisle"
@@ -63,6 +70,7 @@ class ProductTable(BaseTable):
     aisle_id = pw.IntegerField()
     name = pw.CharField(max_length=255, default="")
     price = pw.DoubleField(default=0.0)
+    order = pw.IntegerField(default=0)
 
     class Meta:
         table_name = "product"
@@ -71,8 +79,6 @@ class ProductTable(BaseTable):
 class CameraTable(BaseTable):
     camera_id = pw.AutoField()
     store_id = pw.IntegerField()
-    location_x = pw.IntegerField(default=0)
-    location_y = pw.IntegerField(default=0)
 
     class Meta:
         table_name = "camera"
