@@ -28,6 +28,9 @@ def _row_to_customer(row: CustomerTable) -> Customer:
         entered_at=safe_datetime(row.entered_at),
         exited_at=safe_datetime(row.exited_at),
         store_id=safe_int(row.store_id),
+        age=safe_int(row.age),
+        sex=safe_str(row.sex),
+        race=safe_str(row.race),
     )
 
 
@@ -35,6 +38,10 @@ def _row_to_aisle(row: AisleTable) -> Aisle:
     return Aisle(
         aisle_id=safe_int(row.aisle_id),
         store_id=safe_int(row.store_id),
+        bottom_left_x=safe_int(row.bottom_left_x, default=0),
+        bottom_left_y=safe_int(row.bottom_left_y, default=0),
+        top_right_x=safe_int(row.top_right_x, default=0),
+        top_right_y=safe_int(row.top_right_y, default=0),
     )
 
 
@@ -45,6 +52,7 @@ def _row_to_product(row: ProductTable) -> Product:
         aisle_id=safe_int(row.aisle_id),
         name=safe_str(row.name),
         price=safe_float(row.price),
+        order=safe_int(row.order, default=0),
     )
 
 
@@ -52,8 +60,6 @@ def _row_to_camera(row: CameraTable) -> Camera:
     return Camera(
         camera_id=safe_int(row.camera_id),
         store_id=safe_int(row.store_id),
-        location_x=safe_int(row.location_x, default=0),
-        location_y=safe_int(row.location_y, default=0),
     )
 
 
@@ -134,6 +140,9 @@ def add_customer(customer: Customer) -> Customer:
         entered_at=safe_datetime(customer.entered_at),
         exited_at=safe_datetime(customer.exited_at),
         store_id=safe_int(customer.store_id),
+        age=safe_int(customer.age),
+        sex=safe_str(customer.sex),
+        race=safe_str(customer.race),
     )
     return _row_to_customer(row)
 
@@ -158,6 +167,9 @@ def update_customer(customer: Customer) -> Optional[Customer]:
             entered_at=safe_datetime(customer.entered_at),
             exited_at=safe_datetime(customer.exited_at),
             store_id=safe_int(customer.store_id),
+            age=safe_int(customer.age),
+            sex=safe_str(customer.sex),
+            race=safe_str(customer.race),
         )
         .where(CustomerTable.customer_id == safe_int(customer.customer_id))
         .execute()
@@ -175,7 +187,13 @@ def delete_customer(customer_id: int) -> bool:
 
 
 def add_aisle(aisle: Aisle) -> Aisle:
-    row = AisleTable.create(store_id=safe_int(aisle.store_id))
+    row = AisleTable.create(
+        store_id=safe_int(aisle.store_id),
+        bottom_left_x=safe_int(aisle.bottom_left_x, default=0),
+        bottom_left_y=safe_int(aisle.bottom_left_y, default=0),
+        top_right_x=safe_int(aisle.top_right_x, default=0),
+        top_right_y=safe_int(aisle.top_right_y, default=0),
+    )
     return _row_to_aisle(row)
 
 
@@ -193,7 +211,13 @@ def get_aisles_by_store(store_id: int) -> List[Aisle]:
 
 def update_aisle(aisle: Aisle) -> Optional[Aisle]:
     rows = (
-        AisleTable.update(store_id=safe_int(aisle.store_id))
+        AisleTable.update(
+            store_id=safe_int(aisle.store_id),
+            bottom_left_x=safe_int(aisle.bottom_left_x, default=0),
+            bottom_left_y=safe_int(aisle.bottom_left_y, default=0),
+            top_right_x=safe_int(aisle.top_right_x, default=0),
+            top_right_y=safe_int(aisle.top_right_y, default=0),
+        )
         .where(AisleTable.aisle_id == safe_int(aisle.aisle_id))
         .execute()
     )
@@ -210,6 +234,7 @@ def add_product(product: Product) -> Product:
         aisle_id=safe_int(product.aisle_id),
         name=safe_str(product.name),
         price=safe_float(product.price),
+        order=safe_int(product.order, default=0),
     )
     return _row_to_product(row)
 
@@ -244,6 +269,7 @@ def update_product(product: Product) -> Optional[Product]:
             aisle_id=safe_int(product.aisle_id),
             name=safe_str(product.name),
             price=safe_float(product.price),
+            order=safe_int(product.order, default=0),
         )
         .where(ProductTable.product_id == safe_int(product.product_id))
         .execute()
@@ -263,8 +289,6 @@ def delete_product(product_id: int) -> bool:
 def add_camera(camera: Camera) -> Camera:
     row = CameraTable.create(
         store_id=safe_int(camera.store_id),
-        location_x=safe_int(camera.location_x, default=0),
-        location_y=safe_int(camera.location_y, default=0),
     )
     return _row_to_camera(row)
 
@@ -287,8 +311,6 @@ def update_camera(camera: Camera) -> Optional[Camera]:
     rows = (
         CameraTable.update(
             store_id=safe_int(camera.store_id),
-            location_x=safe_int(camera.location_x, default=0),
-            location_y=safe_int(camera.location_y, default=0),
         )
         .where(CameraTable.camera_id == safe_int(camera.camera_id))
         .execute()
