@@ -11,7 +11,7 @@ from src.database.database_setup import (
     StoreTable, CustomerTable, AisleTable, ProductTable,
     CameraTable, PathTable, CheckoutTable, PurchaseTable, LogTable,
 )
-from src.database.utils import safe_int, safe_float, safe_str, safe_datetime
+from src.database.utils import safe_int, safe_float, safe_str, safe_bool, safe_datetime
 
 
 def _row_to_store(row: StoreTable) -> Store:
@@ -28,9 +28,8 @@ def _row_to_customer(row: CustomerTable) -> Customer:
         entered_at=safe_datetime(row.entered_at),
         exited_at=safe_datetime(row.exited_at),
         store_id=safe_int(row.store_id),
-        age=safe_int(row.age),
+        age=safe_str(row.age),
         sex=safe_str(row.sex),
-        race=safe_str(row.race),
     )
 
 
@@ -42,6 +41,7 @@ def _row_to_aisle(row: AisleTable) -> Aisle:
         bottom_left_y=safe_int(row.bottom_left_y, default=0),
         top_right_x=safe_int(row.top_right_x, default=0),
         top_right_y=safe_int(row.top_right_y, default=0),
+        vertical=safe_bool(row.vertical),
     )
 
 
@@ -140,9 +140,8 @@ def add_customer(customer: Customer) -> Customer:
         entered_at=safe_datetime(customer.entered_at),
         exited_at=safe_datetime(customer.exited_at),
         store_id=safe_int(customer.store_id),
-        age=safe_int(customer.age),
+        age=safe_str(customer.age),
         sex=safe_str(customer.sex),
-        race=safe_str(customer.race),
     )
     return _row_to_customer(row)
 
@@ -167,9 +166,8 @@ def update_customer(customer: Customer) -> Optional[Customer]:
             entered_at=safe_datetime(customer.entered_at),
             exited_at=safe_datetime(customer.exited_at),
             store_id=safe_int(customer.store_id),
-            age=safe_int(customer.age),
+            age=safe_str(customer.age),
             sex=safe_str(customer.sex),
-            race=safe_str(customer.race),
         )
         .where(CustomerTable.customer_id == safe_int(customer.customer_id))
         .execute()
@@ -193,6 +191,7 @@ def add_aisle(aisle: Aisle) -> Aisle:
         bottom_left_y=safe_int(aisle.bottom_left_y, default=0),
         top_right_x=safe_int(aisle.top_right_x, default=0),
         top_right_y=safe_int(aisle.top_right_y, default=0),
+        vertical=safe_bool(aisle.vertical),
     )
     return _row_to_aisle(row)
 
@@ -217,6 +216,7 @@ def update_aisle(aisle: Aisle) -> Optional[Aisle]:
             bottom_left_y=safe_int(aisle.bottom_left_y, default=0),
             top_right_x=safe_int(aisle.top_right_x, default=0),
             top_right_y=safe_int(aisle.top_right_y, default=0),
+            vertical=safe_bool(aisle.vertical),
         )
         .where(AisleTable.aisle_id == safe_int(aisle.aisle_id))
         .execute()

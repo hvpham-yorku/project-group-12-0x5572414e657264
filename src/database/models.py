@@ -56,9 +56,8 @@ class Customer:
     entered_at: datetime = None
     exited_at: datetime = None
     store_id: int = -1
-    age: int = -1
+    age: str = ""
     sex: str = ""
-    race: str = ""
 
 
 @dataclass
@@ -69,6 +68,7 @@ class Aisle:
     bottom_left_y: int = 0
     top_right_x: int = 0
     top_right_y: int = 0
+    vertical: bool = False  # vertical or horizontal
 
 
 @dataclass

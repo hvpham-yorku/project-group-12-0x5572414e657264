@@ -44,9 +44,8 @@ class CustomerTable(BaseTable):
     entered_at = pw.DateTimeField(null=True, default=None)
     exited_at = pw.DateTimeField(null=True, default=None)
     store_id = pw.IntegerField()
-    age = pw.IntegerField(default=-1)
+    age = pw.CharField(max_length=255, default="")
     sex = pw.CharField(max_length=255, default="")
-    race = pw.CharField(max_length=255, default="")
 
     class Meta:
         table_name = "customer"
@@ -59,6 +58,7 @@ class AisleTable(BaseTable):
     bottom_left_y = pw.IntegerField(default=0)
     top_right_x = pw.IntegerField(default=0)
     top_right_y = pw.IntegerField(default=0)
+    vertical = pw.BooleanField(default=False)
 
     class Meta:
         table_name = "aisle"
