@@ -134,3 +134,4 @@ simulate_customer(
     products=[coffee]
 )
 
+close_db()
