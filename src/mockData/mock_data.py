@@ -33,7 +33,7 @@ cereal = add_product(Product(store_id=store.store_id, aisle_id=aisle3.aisle_id, 
 rice = add_product(Product(store_id=store.store_id, aisle_id=aisle1.aisle_id, name="Rice", price=8.00,order=3))
 coffee = add_product(Product(store_id=store.store_id, aisle_id=aisle2.aisle_id, name="Coffee", price=12.30,order=2))
 
-def simulate_customer(age, path_points, products):
+def simulate_customer(age, sex, path_points, products):
 
     enter_time = datetime.now()
 
@@ -41,8 +41,7 @@ def simulate_customer(age, path_points, products):
         entered_at=enter_time,
         store_id=store.store_id,
         age=age,
-        sex="F",
-        race= "Other"
+        sex=sex
     ))
 
     add_log(Log(
@@ -101,37 +100,43 @@ def simulate_customer(age, path_points, products):
 simulate_customer(
     age=20,
     path_points=[(5,5), (10,15), (15,25), (25,30), (30,40), (55,10)],
-    products=[chips,soda]
+    products=[chips,soda],
+    sex = "F"
 )
 
 simulate_customer(
     age=47,
     path_points=[(25,10), (30,20), (45,30), (50,40), (55,10)],
-    products=[milk]
+    products=[milk],
+    sex="F"
 )
 
 simulate_customer(
     age=29,
     path_points=[(10,10), (15,20), (45,25), (50,35), (55,10)],
-    products=[chips]
+    products=[chips],
+    sex="M"
 )
 simulate_customer(
     age=41,
     path_points=[(5,5), (25,10), (45,20), (50,35), (55,10)],
-    products=[milk, cereal]
-
+    products=[milk, cereal],
+    sex="F"
 )
 
 simulate_customer(
     age=19,
     path_points=[(5,5), (15,30), (25,20), (35,45), (45,25), (50,40), (55,10)],
-    products=[rice,coffee,milk]
+    products=[rice,coffee,milk],
+    sex="M"
 )
 simulate_customer(
     age=28,
     path_points=[(5,5), (25,20), (30,35), (55,10)],
-    products=[coffee]
+    products=[coffee],
+    sex="M"
 )
 
 close_db()
+print("done")
 
