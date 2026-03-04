@@ -28,9 +28,8 @@ def _row_to_customer(row: CustomerTable) -> Customer:
         entered_at=safe_datetime(row.entered_at),
         exited_at=safe_datetime(row.exited_at),
         store_id=safe_int(row.store_id),
-        age=safe_int(row.age),
+        age=safe_str(row.age),
         sex=safe_str(row.sex),
-        race=safe_str(row.race),
     )
 
 
@@ -140,9 +139,8 @@ def add_customer(customer: Customer) -> Customer:
         entered_at=safe_datetime(customer.entered_at),
         exited_at=safe_datetime(customer.exited_at),
         store_id=safe_int(customer.store_id),
-        age=safe_int(customer.age),
+        age=safe_str(customer.age),
         sex=safe_str(customer.sex),
-        race=safe_str(customer.race),
     )
     return _row_to_customer(row)
 
@@ -167,9 +165,8 @@ def update_customer(customer: Customer) -> Optional[Customer]:
             entered_at=safe_datetime(customer.entered_at),
             exited_at=safe_datetime(customer.exited_at),
             store_id=safe_int(customer.store_id),
-            age=safe_int(customer.age),
+            age=safe_str(customer.age),
             sex=safe_str(customer.sex),
-            race=safe_str(customer.race),
         )
         .where(CustomerTable.customer_id == safe_int(customer.customer_id))
         .execute()

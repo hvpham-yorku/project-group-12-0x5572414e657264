@@ -56,9 +56,8 @@ class Customer:
     entered_at: datetime = None
     exited_at: datetime = None
     store_id: int = -1
-    age: int = -1
+    age: str = ""
     sex: str = ""
-    race: str = ""
 
 
 @dataclass
