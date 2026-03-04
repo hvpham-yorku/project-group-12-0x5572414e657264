@@ -98,40 +98,40 @@ def simulate_customer(age, sex, path_points, products):
 
 
 simulate_customer(
-    age=20,
+    age="(15-20)",
     path_points=[(5,5), (10,15), (15,25), (25,30), (30,40), (55,10)],
     products=[chips,soda],
     sex = "F"
 )
 
 simulate_customer(
-    age=47,
+    age="(48-53)",
     path_points=[(25,10), (30,20), (45,30), (50,40), (55,10)],
     products=[milk],
     sex="F"
 )
 
 simulate_customer(
-    age=29,
+    age="(25-32)",
     path_points=[(10,10), (15,20), (45,25), (50,35), (55,10)],
     products=[chips],
     sex="M"
 )
 simulate_customer(
-    age=41,
+    age="(38-43)",
     path_points=[(5,5), (25,10), (45,20), (50,35), (55,10)],
     products=[milk, cereal],
     sex="F"
 )
 
 simulate_customer(
-    age=19,
+    age="(15-20)",
     path_points=[(5,5), (15,30), (25,20), (35,45), (45,25), (50,40), (55,10)],
     products=[rice,coffee,milk],
     sex="M"
 )
 simulate_customer(
-    age=28,
+    age="(25-32)",
     path_points=[(5,5), (25,20), (30,35), (55,10)],
     products=[coffee],
     sex="M"
