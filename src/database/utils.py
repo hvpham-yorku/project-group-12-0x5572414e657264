@@ -34,6 +34,16 @@ def safe_str(value, default: str = "") -> str:
     return str(value)
 
 
+def safe_bool(value, default: bool = False) -> bool:
+    """Convert a value to bool, returning *default* on None or failure."""
+    if value is None:
+        return default
+    try:
+        return bool(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def safe_datetime(value) -> Optional[datetime]:
     """Convert a value to datetime.
 
