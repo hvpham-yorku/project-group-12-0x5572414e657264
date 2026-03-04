@@ -72,15 +72,14 @@ class TestCustomerManager(DBTestCase):
         now = datetime(2026, 1, 1, 12, 0, 0)
         cust = mm.add_customer(Customer(
             store_id=store.store_id, entered_at=now,
-            age=30, sex="male", race="asian",
+            age="30", sex="male",
         ))
         self.assertGreater(cust.customer_id, 0)
         self.assertEqual(cust.store_id, store.store_id)
         self.assertEqual(cust.entered_at, now)
         self.assertIsNone(cust.exited_at)
-        self.assertEqual(cust.age, 30)
+        self.assertEqual(cust.age, "30")
         self.assertEqual(cust.sex, "male")
-        self.assertEqual(cust.race, "asian")
 
     def test_get_customer_by_id(self):
         store = self._make_store()
@@ -102,15 +101,14 @@ class TestCustomerManager(DBTestCase):
 
     def test_update_customer(self):
         store = self._make_store()
-        created = mm.add_customer(Customer(store_id=store.store_id, age=25, sex="female", race="white"))
+        created = mm.add_customer(Customer(store_id=store.store_id, age="25", sex="female"))
         exit_time = datetime(2026, 1, 1, 13, 0, 0)
         updated = mm.update_customer(
-            Customer(customer_id=created.customer_id, store_id=store.store_id, exited_at=exit_time, age=26, sex="female", race="white")
+            Customer(customer_id=created.customer_id, store_id=store.store_id, exited_at=exit_time, age="26", sex="female")
         )
         self.assertEqual(updated.exited_at, exit_time)
-        self.assertEqual(updated.age, 26)
+        self.assertEqual(updated.age, "26")
         self.assertEqual(updated.sex, "female")
-        self.assertEqual(updated.race, "white")
 
     def test_delete_customer(self):
         store = self._make_store()
@@ -133,6 +131,7 @@ class TestAisleManager(DBTestCase):
             store_id=store.store_id,
             bottom_left_x=10, bottom_left_y=20,
             top_right_x=100, top_right_y=200,
+            vertical=True,
         ))
         self.assertGreater(aisle.aisle_id, 0)
         self.assertEqual(aisle.store_id, store.store_id)
@@ -140,6 +139,12 @@ class TestAisleManager(DBTestCase):
         self.assertEqual(aisle.bottom_left_y, 20)
         self.assertEqual(aisle.top_right_x, 100)
         self.assertEqual(aisle.top_right_y, 200)
+        self.assertTrue(aisle.vertical)
+
+    def test_add_aisle_default_vertical(self):
+        store = self._make_store()
+        aisle = mm.add_aisle(Aisle(store_id=store.store_id))
+        self.assertFalse(aisle.vertical)
 
     def test_get_aisle_by_id(self):
         store = self._make_store()
@@ -162,16 +167,19 @@ class TestAisleManager(DBTestCase):
         s1 = self._make_store()
         s2 = mm.add_store(Store(name="S2", owner="O2"))
         created = mm.add_aisle(Aisle(store_id=s1.store_id, bottom_left_x=0, bottom_left_y=0, top_right_x=0, top_right_y=0))
+        self.assertFalse(created.vertical)
         updated = mm.update_aisle(Aisle(
             aisle_id=created.aisle_id, store_id=s2.store_id,
             bottom_left_x=5, bottom_left_y=15,
             top_right_x=50, top_right_y=150,
+            vertical=True,
         ))
         self.assertEqual(updated.store_id, s2.store_id)
         self.assertEqual(updated.bottom_left_x, 5)
         self.assertEqual(updated.bottom_left_y, 15)
         self.assertEqual(updated.top_right_x, 50)
         self.assertEqual(updated.top_right_y, 150)
+        self.assertTrue(updated.vertical)
 
     def test_delete_aisle(self):
         store = self._make_store()
