@@ -69,6 +69,7 @@ class Aisle:
     bottom_left_y: int = 0
     top_right_x: int = 0
     top_right_y: int = 0
+    vertical: bool = False  # vertical or horizontal
 
 
 @dataclass
