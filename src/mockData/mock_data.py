@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from itertools import product
+
 
 from src.database.database_setup import initialize_db, close_db
 from src.database.models import (
@@ -39,7 +39,6 @@ def simulate_customer(age, path_points, products):
 
     customer = add_customer(Customer(
         entered_at=enter_time,
-        exited_at=None,
         store_id=store.store_id,
         age=age,
         sex="F",
@@ -83,7 +82,7 @@ def simulate_customer(age, path_points, products):
 
     add_log(Log(
         store_id=store.store_id,
-        action=f"Customer {customer.customer_id} checkout compelete",
+        action=f"Customer {customer.customer_id} checkout complete",
         category="CHECKOUT",
         created_at=current_time
     ))
@@ -101,7 +100,7 @@ def simulate_customer(age, path_points, products):
 
 simulate_customer(
     age=20,
-    path_points=[(5,5), (10,15), (15,25), (25,30), (30,40), (55.10)],
+    path_points=[(5,5), (10,15), (15,25), (25,30), (30,40), (55,10)],
     products=[chips,soda]
 )
 
@@ -135,3 +134,4 @@ simulate_customer(
 )
 
 close_db()
+print("Mock dataset created successfully.")
