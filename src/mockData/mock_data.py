@@ -24,4 +24,10 @@ aisle1 = add_aisle(Aisle(store_id=store.store_id, bottom_left_x=0, bottom_left_y
 aisle2 = add_aisle(Aisle(store_id=store.store_id, bottom_left_x=20, bottom_left_y=0, top_right_x=40, top_right_y=60))
 aisle3 = add_aisle(Aisle(store_id=store.store_id, bottom_left_x=40, bottom_left_y=0, top_right_x=60, top_right_y=60))
 
-chips = add_product(Product(store_id=store.store_id, aisle_id = aisle1.aisle_id,name="Chips", price= 3.49, order = 1))
+chips = add_product(Product(store_id=store.store_id, aisle_id=aisle1.aisle_id, name="Chips", price=3.49,order=1))
+soda = add_product(Product(store_id=store.store_id, aisle_id=aisle2.aisle_id, name="Soda", price=2.25,order=1))
+milk = add_product(Product(store_id=store.store_id, aisle_id=aisle3.aisle_id, name="Milk", price=4.75,order=1))
+cereal = add_product(Product(store_id=store.store_id, aisle_id=aisle3.aisle_id, name="Cereal", price=5.55,order=2))
+rice = add_product(Product(store_id=store.store_id, aisle_id=aisle1.aisle_id, name="Rice", price=8.00,order=3))
+coffee = add_product(Product(store_id=store.store_id, aisle_id=aisle2.aisle_id, name="Coffee", price=12.30,order=2))
+
