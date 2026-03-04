@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from itertools import product
 
 from src.database.database_setup import initialize_db, close_db
 from src.database.models import (
@@ -6,7 +7,8 @@ from src.database.models import (
     Checkout,Purchase,Camera,Log
 )
 from src.database.model_managers import (
-    add_store, add_customer, add_product, add_camera, add_aisle,
+    add_store, add_customer, add_product, add_camera, add_aisle, add_path, add_log, add_checkout, add_purchase,
+    update_customer,
 )
 
 # initialize database
@@ -30,4 +32,72 @@ milk = add_product(Product(store_id=store.store_id, aisle_id=aisle3.aisle_id, na
 cereal = add_product(Product(store_id=store.store_id, aisle_id=aisle3.aisle_id, name="Cereal", price=5.55,order=2))
 rice = add_product(Product(store_id=store.store_id, aisle_id=aisle1.aisle_id, name="Rice", price=8.00,order=3))
 coffee = add_product(Product(store_id=store.store_id, aisle_id=aisle2.aisle_id, name="Coffee", price=12.30,order=2))
+
+def simulate_customer(age, path_points, products):
+
+    enter_time = datetime.now()
+
+    customer = add_customer(Customer(
+        entered_at=enter_time,
+        exited_at=None,
+        store_id=store.store_id,
+        age=age,
+        sex="F",
+        race= "Other"
+    ))
+
+    add_log(Log(
+        store_id=store.store_id,
+        action=f"Customer {customer.customer_id} entered",
+        category="ENTRY",
+        created_at=enter_time
+    ))
+
+    current_time = enter_time
+
+    for x,y in path_points:
+        add_path(Path(
+            customer_id=customer.customer_id,
+            timestamp=current_time,
+            location_x=x,
+            location_y=y
+        ))
+        current_time = timedelta(seconds=5)
+
+    #checkout
+    total = sum(p.price for p in products)
+
+    checkout = add_checkout(Checkout(
+        store_id=store.store_id,
+        customer_id=customer.customer_id,
+        total_price=total,
+        created_at=current_time
+    ))
+
+    for p in products:
+        add_purchase(Purchase(
+            product_id=p.product_id,
+            checkout_id=checkout.checkout_id,
+            quantity = 1
+        ))
+
+    add_log(Log(
+        store_id=store.store_id,
+        action=f"Customer {customer.customer_id} checkout compelete",
+        category="CHECKOUT",
+        created_at=current_time
+    ))
+
+    customer.exited_at = current_time
+    customer = update_customer(customer)
+
+    add_log(Log(
+        store_id=store.store_id,
+        action=f"Customer {customer.customer_id} exited",
+        category="EXIT",
+        created_at=current_time
+    ))
+
+
+
 
