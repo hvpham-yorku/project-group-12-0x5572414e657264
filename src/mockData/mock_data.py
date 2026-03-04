@@ -134,4 +134,4 @@ simulate_customer(
 )
 
 close_db()
-print("Mock dataset created successfully.")
+
