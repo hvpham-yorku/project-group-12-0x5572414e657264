@@ -28,6 +28,10 @@ genderNet=cv2.dnn.readNet(genderModel,genderProto)
 # [NEW COMMENT] Load the pretrained neural network models into OpenCV
 
 
+
+
+
+
 def highlightFace(net, frame, conf_threshold=0.7):
     # [NEW COMMENT] This function detects faces in the given frame using a pretrained face detection model.
     # net: the loaded face detection neural network
@@ -76,6 +80,8 @@ def highlightFace(net, frame, conf_threshold=0.7):
 
     return faceBoxes
     # [NEW COMMENT] Return the image with rectangles + list of face coordinates
+
+
 
 
 
@@ -128,6 +134,8 @@ def estimateAttributes(image_path):
 
     age=ageList[agePreds[0].argmax()]
 # [NEW COMMENT] Select the predicted age group with the highest probability
+
+
    
     return age, gender
 

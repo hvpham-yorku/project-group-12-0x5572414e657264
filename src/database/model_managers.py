@@ -11,7 +11,7 @@ from src.database.database_setup import (
     StoreTable, CustomerTable, AisleTable, ProductTable,
     CameraTable, PathTable, CheckoutTable, PurchaseTable, LogTable,
 )
-from src.database.utils import safe_int, safe_float, safe_str, safe_datetime
+from src.database.utils import safe_int, safe_float, safe_str, safe_bool, safe_datetime
 
 
 def _row_to_store(row: StoreTable) -> Store:
@@ -41,6 +41,7 @@ def _row_to_aisle(row: AisleTable) -> Aisle:
         bottom_left_y=safe_int(row.bottom_left_y, default=0),
         top_right_x=safe_int(row.top_right_x, default=0),
         top_right_y=safe_int(row.top_right_y, default=0),
+        vertical=safe_bool(row.vertical),
     )
 
 
@@ -190,6 +191,7 @@ def add_aisle(aisle: Aisle) -> Aisle:
         bottom_left_y=safe_int(aisle.bottom_left_y, default=0),
         top_right_x=safe_int(aisle.top_right_x, default=0),
         top_right_y=safe_int(aisle.top_right_y, default=0),
+        vertical=safe_bool(aisle.vertical),
     )
     return _row_to_aisle(row)
 
@@ -214,6 +216,7 @@ def update_aisle(aisle: Aisle) -> Optional[Aisle]:
             bottom_left_y=safe_int(aisle.bottom_left_y, default=0),
             top_right_x=safe_int(aisle.top_right_x, default=0),
             top_right_y=safe_int(aisle.top_right_y, default=0),
+            vertical=safe_bool(aisle.vertical),
         )
         .where(AisleTable.aisle_id == safe_int(aisle.aisle_id))
         .execute()
