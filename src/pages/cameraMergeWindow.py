@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from datetime import datetime
 
 import cv2
 
@@ -15,6 +16,7 @@ MERGED_PREVIEW_PATH = os.path.join("assets", "pictures", "merged_preview.png")
 PREVIEW_TEXTURE_TAG = "camera_merge_preview_texture"
 PREVIEW_TEXTURE_REGISTRY_TAG = "camera_merge_texture_registry"
 PREVIEW_IMAGE_WIDGET_TAG = "camera_merge_preview_image"
+DATABASE_VIDEOS_DIR = os.path.join("assets", "databaseVideos")
 
 
 def feature_not_implemented(sender):
@@ -83,6 +85,32 @@ def callback_refresh_table_entries(sender, app_data, user_data):
 
 def callback_video_import_dialog(sender, app_data, user_data):
     videoImportDialog.open_video_import_dialog(sender, app_data, user_data)
+
+
+def callback_merge_selected_videos(sender, app_data, user_data):
+    file_states = SINGLETON.get_selectedVideos()
+    selected = [
+        (path, state["coor"])
+        for path, state in file_states.items()
+        if state["state"]
+    ]
+
+    if not selected:
+        logWindow.addLog(1, "No videos selected to merge.")
+        return
+
+    video_paths = [p for p, _ in selected]
+    coordinates = [tuple(coor) for _, coor in selected]
+
+    os.makedirs(DATABASE_VIDEOS_DIR, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = os.path.join(DATABASE_VIDEOS_DIR, f"merged_{timestamp}.mp4")
+
+    try:
+        mediaEditor.merge_and_blend_videos(video_paths, coordinates, output_path)
+        logWindow.addLog(0, f"Merged video saved to {output_path}")
+    except Exception as exc:
+        logWindow.addLog(2, f"Failed to merge videos: {exc}")
 
 
 def _resize_preview_to_window() -> None:
@@ -210,10 +238,15 @@ def create_camera_merge_window():
         height=450,
     ):
         dpg.add_text("Camera Video Feed Setup")
-        dpg.add_button(
-            label="Import Video File",
-            callback=videoImportDialog.open_video_import_dialog,
-        )
+        with dpg.group(horizontal=True):
+            dpg.add_button(
+                label="Import Video File",
+                callback=videoImportDialog.open_video_import_dialog,
+            )
+            dpg.add_button(
+                label="Merge Selected Videos",
+                callback=callback_merge_selected_videos,
+            )
         with dpg.table(
             tag="videoFiles",
             show=True,

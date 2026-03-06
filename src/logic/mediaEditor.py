@@ -171,6 +171,75 @@ def merge_and_blend_images(image_paths, coordinates, outputPath):
     return final_image
 
 
+def merge_and_blend_videos(video_paths, coordinates, output_path):
+    """
+    Merges a list of videos onto a single canvas. Overlapping regions
+    are blended (averaged) to show transparency.
+
+    Parameters:
+    - video_paths (list[str]): List of video file paths.
+    - coordinates (list[tuple[int, int]]): (x, y) for the top-left corner of each video.
+    - output_path (str): Path to the output video (e.g., 'merged.mp4').
+    """
+    caps = [cv2.VideoCapture(p) for p in video_paths]
+    for cap, path in zip(caps, video_paths):
+        if not cap.isOpened():
+            for c in caps:
+                c.release()
+            raise ValueError(f"Could not open video: {path}")
+
+    for coor in coordinates:
+        if coor[0] < 0 or coor[1] < 0:
+            for c in caps:
+                c.release()
+            raise ValueError("YOUR X AND Y COORDS MUST ALL BE ABOVE OR EQUAL TO 0!!!!")
+
+    if len(caps) != len(coordinates):
+        for c in caps:
+            c.release()
+        raise ValueError("The number of videos must match the number of coordinates.")
+
+    widths = [int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) for cap in caps]
+    heights = [int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) for cap in caps]
+    fps_values = [cap.get(cv2.CAP_PROP_FPS) for cap in caps]
+    fps_values = [fps for fps in fps_values if fps and fps > 0]
+    fps = min(fps_values) if fps_values else 30.0
+
+    max_h, max_w = 0, 0
+    for (w, h), (x, y) in zip(zip(widths, heights), coordinates):
+        max_h = max(max_h, y + h)
+        max_w = max(max_w, x + w)
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(output_path, fourcc, fps, (max_w, max_h))
+
+    while True:
+        frames = []
+        for cap in caps:
+            ret, frame = cap.read()
+            frames.append(frame if ret else None)
+
+        if all(frame is None for frame in frames):
+            break
+
+        canvas = np.zeros((max_h, max_w, 3), dtype=np.float32)
+        counts = np.zeros((max_h, max_w, 1), dtype=np.float32)
+
+        for frame, (x, y) in zip(frames, coordinates):
+            if frame is None:
+                continue
+            h, w = frame.shape[:2]
+            canvas[y : y + h, x : x + w] += frame
+            counts[y : y + h, x : x + w] += 1
+
+        np.divide(canvas, counts, out=canvas, where=counts > 0)
+        blended_frame = canvas.astype(np.uint8)
+        out.write(blended_frame)
+
+    for cap in caps:
+        cap.release()
+    out.release()
+
 # # --- Example Usage ---
 # img1 = cv2.imread(
 #     "/Users/ryanpelchat/Documents/GitHub/project-group-12-0x5572414e657264/src/logic/refPic.png"
