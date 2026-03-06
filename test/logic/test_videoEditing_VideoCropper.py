@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import os
 import tempfile
-from src.logic import videoEditing
+from src.logic import mediaEditor
 
 
 class TestVideoCropper(unittest.TestCase):
@@ -43,7 +43,7 @@ class TestVideoCropper(unittest.TestCase):
         crop_w, crop_h = 50, 40
 
         # Run the function
-        videoEditing.crop_video_opencv(
+        mediaEditor.crop_video_opencv(
             self.input_path, self.output_path, crop_x, crop_y, crop_w, crop_h
         )
 
@@ -80,7 +80,7 @@ class TestVideoCropper(unittest.TestCase):
         # Run the function with a bad input path.
         # Since our function just prints an error and returns, we are checking that
         # it doesn't raise an unhandled exception (like a missing file error).
-        videoEditing.crop_video_opencv(fake_path, self.output_path, 0, 0, 50, 50)
+        mediaEditor.crop_video_opencv(fake_path, self.output_path, 0, 0, 50, 50)
 
         # Verify the output file was NOT created
         self.assertFalse(os.path.exists(self.output_path))

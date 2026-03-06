@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import os
 import tempfile
-from src.logic import videoEditing
+from src.logic import mediaEditor
 
 # Assuming the function is defined in a file named video_tools.py
 # from video_tools import extract_first_frame
@@ -42,7 +42,7 @@ class TestFirstFrameExtractor(unittest.TestCase):
     def test_successful_extraction(self):
         """Tests if the first frame is successfully extracted and saved."""
         # Run the function
-        result = videoEditing.extract_first_frame(
+        result = mediaEditor.extract_first_frame(
             self.input_path, self.output_image_path
         )
 
@@ -73,7 +73,7 @@ class TestFirstFrameExtractor(unittest.TestCase):
         fake_path = os.path.join(self.test_dir.name, "ghost_video.mp4")
 
         # Run the function
-        result = videoEditing.extract_first_frame(fake_path, self.output_image_path)
+        result = mediaEditor.extract_first_frame(fake_path, self.output_image_path)
 
         # 1. Verify the function returned False
         self.assertFalse(
