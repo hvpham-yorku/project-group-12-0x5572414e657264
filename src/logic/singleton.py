@@ -16,16 +16,21 @@ class Singleton:
 
     _instance = None
     _tempFolder: str
+    _tempFolderPictures: str
     _selectedVideos: dict[str, dict[str, bool | List[int, int]]]
     _moveAmount: int
 
     def __init__(self):
-        self._tempFolder = os.path.join(os.getcwd(), "assets/databaseAssets")
+        self._tempFolder = os.path.join(os.getcwd(), "assets/videos")
+        self._tempFolderPictures = os.path.join(os.getcwd(), "assets/pictures")
         self._selectedVideos = {}
-        self._moveAmount = 5
+        self._moveAmount = 50
 
     def get_tempFolder(self):
         return self._tempFolder
+
+    def get_tempFolderPictures(self):
+        return self._tempFolderPictures
 
     def get_selectedVideos(self):
         self.get_all_temp_files()
@@ -67,6 +72,8 @@ class Singleton:
         print("\n\n\n")
 
     def delete_video(self, video: str) -> None:
+        if video in self._selectedVideos:
+            del self._selectedVideos[video]
         if os.path.exists(video):
             os.remove(video)
             logWindow.addLog(0, f"{video} has been deleted.")

@@ -110,31 +110,33 @@ def extract_first_frame(input_path, output_image_path):
         return False
 
 
-def merge_and_blend_images(images, coordinates):
+def merge_and_blend_images(image_paths, coordinates, outputPath):
     """
     Merges a list of images onto a single canvas. Overlapping regions
     are blended (averaged) to show transparency.
 
     Parameters:
     - images (list): List of OpenCV images (NumPy arrays).
+    - images (list): List string paths for the image location.
     - coordinates (list): List of (x, y) tuples for the top-left corner of each image.
     - X AND Y COORDS MUST BE POSITIVE!!!!!!
 
     Returns:
     - NumPy array representing the final blended image.
     """
+    cv2Images = [cv2.imread(x) for x in image_paths]
     for coor in coordinates:
         if coor[0] < 0 or coor[1] < 0:
             raise ValueError("YOUR X AND Y COORDS MUST ALL BE ABOVE OR EQUAL TO 0!!!!")
 
-    if len(images) != len(coordinates):
+    if len(cv2Images) != len(coordinates):
         print("Error: The number of images must match the number of coordinates.")
         return None
 
     # 1. Calculate the final canvas size
     # We find the furthest x and y points reached by any image
     max_h, max_w = 0, 0
-    for img, (x, y) in zip(images, coordinates):
+    for img, (x, y) in zip(cv2Images, coordinates):
         h, w = img.shape[:2]
         max_h = max(max_h, y + h)
         max_w = max(max_w, x + w)
@@ -147,7 +149,7 @@ def merge_and_blend_images(images, coordinates):
     counts = np.zeros((max_h, max_w, 1), dtype=np.float32)
 
     # 3. Stack the images
-    for img, (x, y) in zip(images, coordinates):
+    for img, (x, y) in zip(cv2Images, coordinates):
         h, w = img.shape[:2]
 
         # Add the pixel values to the canvas
@@ -163,6 +165,8 @@ def merge_and_blend_images(images, coordinates):
 
     # 5. Convert back to standard 8-bit image format
     final_image = canvas.astype(np.uint8)
+
+    cv2.imwrite(outputPath, final_image)
 
     return final_image
 

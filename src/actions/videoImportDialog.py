@@ -60,7 +60,7 @@ def open_video_import_dialog(sender, app_data, user_data):
     # SHARED COPY LOGIC
     # ---------------------------------------------------------
     file_name = os.path.basename(source_file_path)
-    destination_dir = os.path.join(os.getcwd(), "assets/databaseAssets")
+    destination_dir = SINGLETON.get_tempFolder()
     destination_file_path = os.path.join(destination_dir, file_name)
 
     try:
