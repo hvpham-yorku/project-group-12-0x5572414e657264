@@ -2,7 +2,6 @@ import unittest
 from unittest.mock import patch, MagicMock
 import numpy as np
 
- # import the function we want to test
 from src.logic.customerAttributesEstimator import estimateAttributes
 
 
@@ -23,9 +22,7 @@ class TestCustomerAttributesEstimator(unittest.TestCase):
         - no real database is accessed
         """
 
-        # --------------------------------------------------
         # Patch image loading
-        # --------------------------------------------------
         self.patcher_imread = patch(
             "src.logic.customerAttributesEstimator.cv2.imread"
         )
@@ -33,9 +30,7 @@ class TestCustomerAttributesEstimator(unittest.TestCase):
         self.addCleanup(self.patcher_imread.stop)
 
 
-        # --------------------------------------------------
         # Patch face detection
-        # --------------------------------------------------
         self.patcher_face = patch(
             "src.logic.customerAttributesEstimator.highlightFace"
         )
@@ -43,9 +38,7 @@ class TestCustomerAttributesEstimator(unittest.TestCase):
         self.addCleanup(self.patcher_face.stop)
 
 
-        # --------------------------------------------------
         # Patch database functions
-        # --------------------------------------------------
         self.patcher_get_customer = patch(
             "src.logic.customerAttributesEstimator.get_customer_by_id"
         )
@@ -60,11 +53,7 @@ class TestCustomerAttributesEstimator(unittest.TestCase):
         self.addCleanup(self.patcher_update_customer.stop)
 
 
-        # --------------------------------------------------
-        # Patch ML models
-        # --------------------------------------------------
-        # We replace the neural networks so the tests
-        # don't require loading real model files.
+        # Patch models
         # improves consistency for the sake of testing
 
         self.patcher_genderNet = patch(
