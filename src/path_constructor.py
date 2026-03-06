@@ -13,3 +13,11 @@ def get_customer_path_points(customer_id):
 def sort_path_points(path_points):
     return sorted(path_points, key=lambda p: p.timestamp)
 
+#Convert path rows into coordinate tuples
+def convert_to_coordinates(path_points):
+    coordinates = []
+    for p in path_points:
+        coordinates.append([p.location_x, p.location_y])
+
+    return coordinates
+
