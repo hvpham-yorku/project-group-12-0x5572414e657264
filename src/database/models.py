@@ -75,6 +75,7 @@ class Aisle:
 class Camera:
     camera_id: int = -1
     store_id: int = -1
+    relative_file_path: str = ""
 
 
 @dataclass

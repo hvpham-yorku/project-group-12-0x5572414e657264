@@ -60,6 +60,7 @@ def _row_to_camera(row: CameraTable) -> Camera:
     return Camera(
         camera_id=safe_int(row.camera_id),
         store_id=safe_int(row.store_id),
+        relative_file_path=safe_str(row.relative_file_path),
     )
 
 
@@ -289,6 +290,7 @@ def delete_product(product_id: int) -> bool:
 def add_camera(camera: Camera) -> Camera:
     row = CameraTable.create(
         store_id=safe_int(camera.store_id),
+        relative_file_path=safe_str(camera.relative_file_path),
     )
     return _row_to_camera(row)
 
@@ -311,6 +313,7 @@ def update_camera(camera: Camera) -> Optional[Camera]:
     rows = (
         CameraTable.update(
             store_id=safe_int(camera.store_id),
+            relative_file_path=safe_str(camera.relative_file_path),
         )
         .where(CameraTable.camera_id == safe_int(camera.camera_id))
         .execute()
