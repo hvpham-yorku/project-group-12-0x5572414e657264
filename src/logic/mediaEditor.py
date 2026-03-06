@@ -118,10 +118,15 @@ def merge_and_blend_images(images, coordinates):
     Parameters:
     - images (list): List of OpenCV images (NumPy arrays).
     - coordinates (list): List of (x, y) tuples for the top-left corner of each image.
+    - X AND Y COORDS MUST BE POSITIVE!!!!!!
 
     Returns:
     - NumPy array representing the final blended image.
     """
+    for coor in coordinates:
+        if coor[0] < 0 or coor[1] < 0:
+            raise ValueError("YOUR X AND Y COORDS MUST ALL BE ABOVE OR EQUAL TO 0!!!!")
+
     if len(images) != len(coordinates):
         print("Error: The number of images must match the number of coordinates.")
         return None
@@ -162,13 +167,19 @@ def merge_and_blend_images(images, coordinates):
     return final_image
 
 
-# --- Example Usage ---
-img1 = cv2.imread("pic1.jpg")
-img2 = cv2.imread("pic2.jpg")
-img3 = cv2.imread("pic3.jpg")
+# # --- Example Usage ---
+# img1 = cv2.imread(
+#     "/Users/ryanpelchat/Documents/GitHub/project-group-12-0x5572414e657264/src/logic/refPic.png"
+# )
+# img2 = cv2.imread(
+#     "/Users/ryanpelchat/Documents/GitHub/project-group-12-0x5572414e657264/src/logic/refPic.png"
+# )
+# img3 = cv2.imread(
+#     "/Users/ryanpelchat/Documents/GitHub/project-group-12-0x5572414e657264/src/logic/refPic.png"
+# )
 
-my_images = [img1, img2, img3]
-my_coords = [(0, 0), (50, 50), (100, 20)]  # (x, y) pairs
+# my_images = [img1, img2, img3]
+# my_coords = [(0, 0), (1000, 1000), (2000, 1000)]  # (x, y) pairs
 
-blended_result = merge_and_blend_images(my_images, my_coords)
-cv2.imwrite("blended_output.jpg", blended_result)
+# blended_result = merge_and_blend_images(my_images, my_coords)
+# cv2.imwrite("blended_output.png", blended_result)
