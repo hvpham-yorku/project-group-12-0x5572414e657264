@@ -115,7 +115,7 @@ class TestPathConstructor(PathTestCase):
 
         mock_get_points.return_value = [p for p in points if p.customer_id == 201]
         path=construct_path(201)
-        expected = [[50,40], [52.44]]
+        expected = [[50,40], [52,44]]
         self.assertEqual(path, expected)
 
     #test for duplicate coordinates

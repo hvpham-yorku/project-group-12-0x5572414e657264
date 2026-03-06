@@ -28,6 +28,12 @@ def construct_path(customer_id):
     if not points:
         return []
 
+    timestamps = set()
+    for p in points:
+        #negative coordinates not allowed
+        if p.location_x < 0 or p.location_y < 0:
+            raise ValueError("Negative coordinates not allowed")
+
     sorted_points = sort_path_points(points)
 
     path = convert_to_coordinates(sorted_points)
