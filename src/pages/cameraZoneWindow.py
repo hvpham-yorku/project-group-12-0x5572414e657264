@@ -5,7 +5,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from src.database.model_managers import get_aisles_by_store, get_all_stores
-from src.database.model_managers import add_aisle
+from src.database.model_managers import add_aisle, delete_aisle
 from src.database.models import Aisle
 from src.pages import logWindow
 from src.logic import singleton
@@ -15,7 +15,6 @@ DATABASE_VIDEOS_DIR = SINGLETON.get_databaseVideoFolder()
 
 WINDOW_TAG = "camera_zone_window"
 VIDEO_DROPDOWN_TAG = "camera_zone_video_dropdown"
-ZONE_LOAD_DROPDOWN_TAG = "camera_zone_load_dropdown"
 STORE_DROPDOWN_TAG = "camera_zone_store_dropdown"
 ZONE_LIST_TAG = "camera_zone_list"
 
@@ -56,6 +55,19 @@ def _get_store_options() -> list[str]:
         options.append(label)
         STORE_LABEL_TO_ID[label] = store.store_id
     return options
+
+
+def refresh_store_dropdowns() -> None:
+    store_options = _get_store_options()
+    default_store = store_options[0] if store_options else ""
+
+    if dpg.does_item_exist(STORE_DROPDOWN_TAG):
+        current = dpg.get_value(STORE_DROPDOWN_TAG)
+        dpg.configure_item(STORE_DROPDOWN_TAG, items=store_options)
+        dpg.set_value(
+            STORE_DROPDOWN_TAG,
+            current if current in store_options else default_store,
+        )
 
 
 def _get_selected_store_id() -> int | None:
@@ -237,9 +249,7 @@ def callback_select_zone(sender, app_data, user_data):
 
 
 def callback_load_zones(sender, app_data, user_data):
-    if not app_data:
-        return
-    store_id = STORE_LABEL_TO_ID.get(app_data)
+    store_id = _get_selected_store_id()
     if store_id is None:
         return
 
@@ -261,7 +271,9 @@ def callback_load_zones(sender, app_data, user_data):
     SELECTED_ZONE_INDEX = 0 if ZONES else 0
     _refresh_zone_list()
     _update_preview()
-    logWindow.addLog(0, f"Loaded {len(ZONES)} zones from store {store_id}.")
+    silent = isinstance(user_data, dict) and user_data.get("silent")
+    if not silent:
+        logWindow.addLog(0, f"Loaded {len(ZONES)} zones from store {store_id}.")
 
 
 def callback_add_zone(sender, app_data, user_data):
@@ -269,7 +281,11 @@ def callback_add_zone(sender, app_data, user_data):
     global SELECTED_ZONE_INDEX
     SELECTED_ZONE_INDEX = len(ZONES) - 1
     _refresh_zone_list()
-    _update_preview()
+    if store_options:
+        dpg.set_value(STORE_DROPDOWN_TAG, default_store)
+        callback_load_zones(None, None, {"silent": True})
+    else:
+        _update_preview()
 
 
 def callback_remove_zone(sender, app_data, user_data):
@@ -309,6 +325,10 @@ def callback_done(sender, app_data, user_data):
     if store_id is None:
         logWindow.addLog(1, "No store selected. Cannot save zones.")
         return
+
+    # Replace existing zones for the store
+    for aisle in get_aisles_by_store(store_id):
+        delete_aisle(aisle.aisle_id)
 
     for zone in ZONES:
         add_aisle(
@@ -362,13 +382,6 @@ def create_camera_zone_window():
                 items=store_options,
                 default_value=default_store,
                 tag=STORE_DROPDOWN_TAG,
-                width=220,
-            )
-            dpg.add_text("Load Zones:")
-            dpg.add_combo(
-                items=store_options,
-                default_value=default_store,
-                tag=ZONE_LOAD_DROPDOWN_TAG,
                 callback=callback_load_zones,
                 width=220,
             )
