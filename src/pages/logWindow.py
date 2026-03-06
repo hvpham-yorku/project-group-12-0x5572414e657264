@@ -1,5 +1,9 @@
 import dearpygui.dearpygui as dpg
 from datetime import datetime
+import os
+import platform
+import shutil
+import subprocess
 
 from src.database.model_managers import add_log
 from src.database.models import Log
@@ -50,3 +54,36 @@ def addLog(severityLevel: int, message: str) -> None:
             created_at=now,
         )
     )
+
+    if severityLevel == 1:
+        _play_warning_sound()
+
+
+def _play_warning_sound() -> None:
+    try:
+        system = platform.system()
+        if system == "Windows":
+            import winsound
+
+            winsound.MessageBeep(winsound.MB_ICONWARNING)
+            return
+
+        if system == "Darwin":
+            sound_path = "/System/Library/Sounds/Glass.aiff"
+            if os.path.exists(sound_path):
+                subprocess.Popen(["afplay", sound_path])
+            return
+
+        # Linux / other UNIX
+        if shutil.which("paplay"):
+            sound_path = "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
+            if os.path.exists(sound_path):
+                subprocess.Popen(["paplay", sound_path])
+                return
+        if shutil.which("aplay"):
+            sound_path = "/usr/share/sounds/alsa/Front_Center.wav"
+            if os.path.exists(sound_path):
+                subprocess.Popen(["aplay", sound_path])
+                return
+    except Exception:
+        pass
