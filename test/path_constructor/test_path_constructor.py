@@ -91,7 +91,17 @@ class TestPathConstructor(PathTestCase):
             make_point(customer_id, 1, 2, start),
             make_point(customer_id, 8, 20, start + timedelta(seconds=6)),
             make_point(customer_id, 12, 5, start + timedelta(seconds=11)),
-            make_point(customer_id, 25, 30, start + timedelta(seconds=16)), ]
+            make_point(customer_id, 25, 30, start + timedelta(seconds=16)),
+        ]
+
+        mock_get_points.return_value = points
+        path = construct_path(customer_id)
+        expected = [[1,2], [8,20], [12,5], [25,30]]
+        self.assertEqual(path, expected)
+
+
+
+
 
 
 if __name__ == '__main__':
