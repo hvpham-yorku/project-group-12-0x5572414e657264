@@ -1,5 +1,6 @@
 from src.pages import logWindow
 from src.logic import singleton
+from src.pages import cameraMergeWindow
 import platform
 import subprocess
 import shutil
@@ -68,3 +69,5 @@ def open_video_import_dialog(sender, app_data, user_data):
         print(f"[{current_os}] Copied: {source_file_path} -> {destination_file_path}")
     except Exception as e:
         logWindow.addLog(2, f"ERROR!!!!!!!!: {str(e)}")
+
+    cameraMergeWindow.callback_refresh_table_entries(None, None, None)

@@ -1,5 +1,7 @@
 from typing import *
 import os
+from pathlib import Path
+from src.pages import logWindow
 
 
 class Singleton:
@@ -10,20 +12,64 @@ class Singleton:
     """
 
     _instance = None
-    _videos: List[str]
     _tempFolder: str
+    _selectedVideos: dict[str, bool]
 
     def __init__(self):
-        self._videos = []
         self._tempFolder = os.path.join(os.getcwd(), "assets/databaseAssets")
-
-    def get_videoList(self):
-        return self._videos
+        self._selectedVideos = {}
 
     def get_tempFolder(self):
         return self._tempFolder
+
+    def get_selectedVideos(self):
+        self.get_all_temp_files()
+        return self._selectedVideos
+
+    def set_selectedVideo(self, video: str, state: bool) -> None:
+        self.get_all_temp_files()
+        self._selectedVideos[video] = state
+
+    def delete_video(self, video: str) -> None:
+        if os.path.exists(video):
+            os.remove(video)
+            logWindow.addLog(0, f"{video} has been deleted.")
+            print(f"{video} has been deleted.")
+        else:
+            logWindow.addLog(
+                2,
+                f"{video} has been requested to be deleted but the file cannot be found",
+            )
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(Singleton, cls).__new__(cls)
         return cls._instance
+
+    def get_all_temp_files(self, recursive=False) -> List[str]:
+        """
+        Returns a list of all files in a folder as absolute paths.
+
+        :param recursive: If True, searches all subfolders. If False, only the top folder.
+        :return: A list of Path objects (which can be easily converted to strings).
+        """
+        # Convert string input to a Path object
+        path = Path(self._tempFolder)
+
+        # Check if the path exists and is a directory
+        if not path.is_dir():
+            return f"Error: {self._tempFolder} is not a valid directory."
+
+        # Use rglob('*') for recursive or glob('*') for top-level only
+        search_pattern = "**/*" if recursive else "*"
+
+        # Filter for files only (ignoring folders in the results)
+        files = [f.absolute() for f in path.glob(search_pattern) if f.is_file()]
+
+        files = [str(x) for x in files]
+
+        for file in files:
+            if file not in self._selectedVideos:
+                self._selectedVideos[file] = False
+
+        return files
