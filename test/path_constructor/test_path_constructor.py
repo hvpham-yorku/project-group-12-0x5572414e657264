@@ -101,7 +101,40 @@ class TestPathConstructor(PathTestCase):
 
 
 
+    #test for multiple customers
+    @patch("src.path_constructor.get_customer_path_points")
+    def test_multiple_customers(self, mock_get_points):
+        start=datetime.now()
+        #mixed customer data( 200 and 201)
+        points = [
+            make_point(200, 2, 3, start),
+            make_point(201, 50, 40, start + timedelta(seconds=3)),
+            make_point(200, 5, 6, start + timedelta(seconds=5)),
+            make_point(201, 52, 44, start + timedelta(seconds=9)),
+        ]
 
+        mock_get_points.return_value = [p for p in points if p.customer_id == 201]
+        path=construct_path(201)
+        expected = [[50,40], [52.44]]
+        self.assertEqual(path, expected)
+
+    #test for duplicate coordinates
+    @patch("src.path_constructor.get_customer_path_points")
+    def tets_duplicate_coordinates(self, mock_get_points):
+        customer_id = 300
+        start = datetime.now()
+
+        points = [
+            make_point(customer_id, 10, 10, start),
+            make_point(customer_id, 15, 18, start + timedelta(seconds=5)),
+            make_point(customer_id, 10, 10, start + timedelta(seconds=10)),
+            make_point(customer_id, 10, 10, start + timedelta(seconds=15)),
+        ]
+
+        mock_get_points.return_value = points
+        path = construct_path(customer_id)
+        expected = [ [10,10], [15,18], [10,10], [10,10]]
+        self.assertEqual(path, expected)
 
 
 if __name__ == '__main__':
