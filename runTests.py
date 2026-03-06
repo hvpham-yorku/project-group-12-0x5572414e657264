@@ -2,7 +2,7 @@ import os
 import subprocess
 
 testsToRun = [
-    "test.logic.test_videoEditing",
+    "test.logic.test_videoEditing_VideoCropper",
 ]
 
 
