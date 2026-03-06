@@ -4,20 +4,25 @@ from pathlib import Path
 from src.pages import logWindow
 
 
+# TODO later we can have the user adjust the move amount
 class Singleton:
     """Is a singleton to hold all temporary data that the program needs
 
     Attributes:
         videos (list[str]): List of path strings for videos uploaded
+        _selectedVideos (dict[str, dict[str, bool | List[int, int]]]):
+            dict[path, dict[state: bool, coor: list[int, int]]]
     """
 
     _instance = None
     _tempFolder: str
-    _selectedVideos: dict[str, bool]
+    _selectedVideos: dict[str, dict[str, bool | List[int, int]]]
+    _moveAmount: int
 
     def __init__(self):
         self._tempFolder = os.path.join(os.getcwd(), "assets/databaseAssets")
         self._selectedVideos = {}
+        self._moveAmount = 5
 
     def get_tempFolder(self):
         return self._tempFolder
@@ -28,7 +33,38 @@ class Singleton:
 
     def set_selectedVideo(self, video: str, state: bool) -> None:
         self.get_all_temp_files()
-        self._selectedVideos[video] = state
+        self._selectedVideos[video]["state"] = state
+
+    def update_selectedVideoCoordinates(self, video: str, direction: str) -> None:
+        """
+        direction must be "up", "down", "left", "right" only!!!!
+        amount must be greather than 0
+        """
+        print(self._selectedVideos[video])
+        amount = self._moveAmount
+        if amount < 0:
+            print(
+                "THE AMOUNT SENT TO update_selectedVideoCoordinates in the singleton class MUST be greather than 0!!!"
+            )
+            logWindow.addLog(1, f"The amount MUST be greather than 0!")
+            return
+        match direction:
+            case "up":
+                if self._selectedVideos[video]["coor"][1] - amount >= 0:
+                    self._selectedVideos[video]["coor"][1] -= amount
+                else:
+                    logWindow.addLog(1, f"Cannot move {video} any higher")
+            case "down":
+                self._selectedVideos[video]["coor"][1] += amount
+            case "left":
+                if self._selectedVideos[video]["coor"][0] - amount >= 0:
+                    self._selectedVideos[video]["coor"][0] -= amount
+                else:
+                    logWindow.addLog(1, f"Cannot move {video} any more to the left!")
+            case "right":
+                self._selectedVideos[video]["coor"][0] += amount
+        print(self._selectedVideos[video])
+        print("\n\n\n")
 
     def delete_video(self, video: str) -> None:
         if os.path.exists(video):
@@ -70,6 +106,6 @@ class Singleton:
 
         for file in files:
             if file not in self._selectedVideos:
-                self._selectedVideos[file] = False
+                self._selectedVideos[file] = {"state": False, "coor": [0, 0]}
 
         return files
