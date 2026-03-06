@@ -5,6 +5,7 @@ testsToRun = [
     "test.logic.test_videoEditing_VideoCropper",
     "test.logic.test_videoEditing_FirstFrameExtractor",
     "test.logic.test_videoEditing_merge_and_blend_images",
+    "test.logic.test_singleton",
 ]
 
 
