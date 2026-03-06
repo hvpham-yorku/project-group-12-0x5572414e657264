@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import dearpygui.dearpygui as dpg
 
+from src.database.model_managers import get_aisles_by_store, get_all_stores
 from src.database.model_managers import add_aisle
 from src.database.models import Aisle
 from src.pages import logWindow
@@ -14,6 +15,8 @@ DATABASE_VIDEOS_DIR = SINGLETON.get_databaseVideoFolder()
 
 WINDOW_TAG = "camera_zone_window"
 VIDEO_DROPDOWN_TAG = "camera_zone_video_dropdown"
+ZONE_LOAD_DROPDOWN_TAG = "camera_zone_load_dropdown"
+STORE_DROPDOWN_TAG = "camera_zone_store_dropdown"
 ZONE_LIST_TAG = "camera_zone_list"
 
 PREVIEW_TEXTURE_TAG = "camera_zone_preview_texture"
@@ -27,6 +30,7 @@ RESIZE_STEP = 10
 ZONES: list[dict[str, int]] = []
 SELECTED_ZONE_INDEX = 0
 SELECTED_VIDEO_PATH: str | None = None
+STORE_LABEL_TO_ID: dict[str, int] = {}
 
 
 def _list_database_videos() -> list[str]:
@@ -39,6 +43,26 @@ def _list_database_videos() -> list[str]:
         if os.path.splitext(f)[1].lower() in allowed
     ]
     return sorted(files)
+
+
+def _get_store_options() -> list[str]:
+    stores = get_all_stores()
+    if not stores:
+        return []
+    options: list[str] = []
+    STORE_LABEL_TO_ID.clear()
+    for store in stores:
+        label = f"{store.store_id} - {store.name or 'Unnamed Store'}"
+        options.append(label)
+        STORE_LABEL_TO_ID[label] = store.store_id
+    return options
+
+
+def _get_selected_store_id() -> int | None:
+    if not dpg.does_item_exist(STORE_DROPDOWN_TAG):
+        return None
+    label = dpg.get_value(STORE_DROPDOWN_TAG)
+    return STORE_LABEL_TO_ID.get(label)
 
 
 def _get_selected_video_path() -> str | None:
@@ -212,6 +236,34 @@ def callback_select_zone(sender, app_data, user_data):
     _update_preview()
 
 
+def callback_load_zones(sender, app_data, user_data):
+    if not app_data:
+        return
+    store_id = STORE_LABEL_TO_ID.get(app_data)
+    if store_id is None:
+        return
+
+    aisles = get_aisles_by_store(store_id)
+    ZONES.clear()
+    for aisle in aisles:
+        width = max(1, int(aisle.top_right_x - aisle.bottom_left_x))
+        height = max(1, int(aisle.top_right_y - aisle.bottom_left_y))
+        ZONES.append(
+            {
+                "x": int(aisle.bottom_left_x),
+                "y": int(aisle.bottom_left_y),
+                "w": width,
+                "h": height,
+            }
+        )
+
+    global SELECTED_ZONE_INDEX
+    SELECTED_ZONE_INDEX = 0 if ZONES else 0
+    _refresh_zone_list()
+    _update_preview()
+    logWindow.addLog(0, f"Loaded {len(ZONES)} zones from store {store_id}.")
+
+
 def callback_add_zone(sender, app_data, user_data):
     ZONES.append({"x": 0, "y": 0, "w": DEFAULT_ZONE_SIZE[0], "h": DEFAULT_ZONE_SIZE[1]})
     global SELECTED_ZONE_INDEX
@@ -253,10 +305,15 @@ def callback_done(sender, app_data, user_data):
         logWindow.addLog(1, "No zones to save.")
         return
 
+    store_id = _get_selected_store_id()
+    if store_id is None:
+        logWindow.addLog(1, "No store selected. Cannot save zones.")
+        return
+
     for zone in ZONES:
         add_aisle(
             Aisle(
-                store_id=1,
+                store_id=store_id,
                 bottom_left_x=int(zone["x"]),
                 bottom_left_y=int(zone["y"]),
                 top_right_x=int(zone["x"] + zone["w"]),
@@ -265,7 +322,7 @@ def callback_done(sender, app_data, user_data):
             )
         )
 
-    logWindow.addLog(0, f"Saved {len(ZONES)} zones to the database.")
+    logWindow.addLog(0, f"Saved {len(ZONES)} zones to store {store_id}.")
 
 
 def create_camera_zone_window():
@@ -279,6 +336,8 @@ def create_camera_zone_window():
 
     videos = _list_database_videos()
     default_video = videos[0] if videos else ""
+    store_options = _get_store_options()
+    default_store = store_options[0] if store_options else ""
     _set_selected_video_by_name(default_video if default_video else None)
 
     with dpg.window(
@@ -297,6 +356,21 @@ def create_camera_zone_window():
                 tag=VIDEO_DROPDOWN_TAG,
                 callback=callback_select_video,
                 width=300,
+            )
+            dpg.add_text("Store:")
+            dpg.add_combo(
+                items=store_options,
+                default_value=default_store,
+                tag=STORE_DROPDOWN_TAG,
+                width=220,
+            )
+            dpg.add_text("Load Zones:")
+            dpg.add_combo(
+                items=store_options,
+                default_value=default_store,
+                tag=ZONE_LOAD_DROPDOWN_TAG,
+                callback=callback_load_zones,
+                width=220,
             )
             dpg.add_button(label="Done", callback=callback_done)
 
