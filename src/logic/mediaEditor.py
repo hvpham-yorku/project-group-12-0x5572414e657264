@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 
 
 def crop_video_opencv(input_path, output_path, x, y, width, height):
@@ -107,3 +108,67 @@ def extract_first_frame(input_path, output_image_path):
     else:
         print("Error: Could not read the first frame from the video.")
         return False
+
+
+def merge_and_blend_images(images, coordinates):
+    """
+    Merges a list of images onto a single canvas. Overlapping regions
+    are blended (averaged) to show transparency.
+
+    Parameters:
+    - images (list): List of OpenCV images (NumPy arrays).
+    - coordinates (list): List of (x, y) tuples for the top-left corner of each image.
+
+    Returns:
+    - NumPy array representing the final blended image.
+    """
+    if len(images) != len(coordinates):
+        print("Error: The number of images must match the number of coordinates.")
+        return None
+
+    # 1. Calculate the final canvas size
+    # We find the furthest x and y points reached by any image
+    max_h, max_w = 0, 0
+    for img, (x, y) in zip(images, coordinates):
+        h, w = img.shape[:2]
+        max_h = max(max_h, y + h)
+        max_w = max(max_w, x + w)
+
+    # 2. Initialize accumulators
+    # We use float32 because stacking uint8 (0-255) pixels will immediately overflow
+    canvas = np.zeros((max_h, max_w, 3), dtype=np.float32)
+
+    # We use this to count how many images are stacked on a specific pixel
+    counts = np.zeros((max_h, max_w, 1), dtype=np.float32)
+
+    # 3. Stack the images
+    for img, (x, y) in zip(images, coordinates):
+        h, w = img.shape[:2]
+
+        # Add the pixel values to the canvas
+        canvas[y : y + h, x : x + w] += img
+
+        # Increment the count by 1 for this specific area
+        counts[y : y + h, x : x + w] += 1
+
+    # 4. Average the overlapping pixels
+    # We divide the accumulated pixel values by the number of overlapping images.
+    # The 'where=counts > 0' prevents dividing by zero in the black background areas.
+    np.divide(canvas, counts, out=canvas, where=counts > 0)
+
+    # 5. Convert back to standard 8-bit image format
+    final_image = canvas.astype(np.uint8)
+
+    return final_image
+
+
+# --- Example Usage ---
+img1 = cv2.imread("pic1.jpg")
+img2 = cv2.imread("pic2.jpg")
+img3 = cv2.imread("pic3.jpg")
+
+my_images = [img1, img2, img3]
+my_coords = [(0, 0), (50, 50), (100, 20)]  # (x, y) pairs
+
+blended_result = merge_and_blend_images(my_images, my_coords)
+cv2.imwrite("blended_output.jpg", blended_result)
