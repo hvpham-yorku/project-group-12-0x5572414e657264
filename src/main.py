@@ -3,6 +3,9 @@ import dearpygui.dearpygui as dpg
 from src.themes import themes
 from src.pages import mainWindow
 from src.pages import menuBar
+from src.logic import singleton
+
+SINGLETON = singleton.Singleton()
 
 
 def main():
