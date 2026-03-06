@@ -19,10 +19,12 @@ class Singleton:
     _tempFolderPictures: str
     _selectedVideos: dict[str, dict[str, bool | List[int, int]]]
     _moveAmount: int
+    _databaseVideoFolder: str
 
     def __init__(self):
         self._tempFolder = os.path.join(os.getcwd(), "assets/videos")
         self._tempFolderPictures = os.path.join(os.getcwd(), "assets/pictures")
+        self._databaseVideoFolder = os.path.join(os.getcwd(), "assets/databaseVideos")
         self._selectedVideos = {}
         self._moveAmount = 50
 
@@ -31,6 +33,9 @@ class Singleton:
 
     def get_tempFolderPictures(self):
         return self._tempFolderPictures
+
+    def get_databaseVideoFolder(self):
+        return self._databaseVideoFolder
 
     def get_selectedVideos(self):
         self.get_all_temp_files()

@@ -5,6 +5,7 @@ from src.pages import logWindow
 from src.pages import cameraMergeWindow
 from src.logic import singleton
 from src.actions import videoImportDialog
+from src.pages import cameraZoneWindow
 import os
 import tkinter as tk
 from tkinter import filedialog
@@ -38,6 +39,10 @@ def set_retro(sender):
 
 def openCameraMergeWindow(sender, app_data, user_data):
     cameraMergeWindow.create_camera_merge_window()
+
+
+def openZoneWindow(sender, app_data, user_data):
+    cameraZoneWindow.create_camera_zone_window()
 
 
 def open_github_page(sender, app_data, user_data):
@@ -78,6 +83,7 @@ def menuBar():
             dpg.add_menu_item(
                 label="Create merged camera video file", callback=openCameraMergeWindow
             )
+            dpg.add_menu_item(label="Create aisles for store", callback=openZoneWindow)
             dpg.add_menu_item(label="DATABASE WIPE", callback=feature_not_implemented)
         with dpg.menu(label="View"):
             with dpg.menu(label="Themes"):
