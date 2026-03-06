@@ -79,6 +79,7 @@ class ProductTable(BaseTable):
 class CameraTable(BaseTable):
     camera_id = pw.AutoField()
     store_id = pw.IntegerField()
+    relative_file_path = pw.CharField(default="")
 
     class Meta:
         table_name = "camera"

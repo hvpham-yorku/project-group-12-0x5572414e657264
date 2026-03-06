@@ -255,9 +255,15 @@ class TestCameraManager(DBTestCase):
 
     def test_add_camera(self):
         store = self._make_store()
-        cam = mm.add_camera(Camera(store_id=store.store_id))
+        cam = mm.add_camera(Camera(store_id=store.store_id, relative_file_path="cameras/cam1.mp4"))
         self.assertGreater(cam.camera_id, 0)
         self.assertEqual(cam.store_id, store.store_id)
+        self.assertEqual(cam.relative_file_path, "cameras/cam1.mp4")
+
+    def test_add_camera_default_relative_file_path(self):
+        store = self._make_store()
+        cam = mm.add_camera(Camera(store_id=store.store_id))
+        self.assertEqual(cam.relative_file_path, "")
 
     def test_get_camera_by_id(self):
         store = self._make_store()
@@ -279,11 +285,12 @@ class TestCameraManager(DBTestCase):
     def test_update_camera(self):
         s1 = self._make_store()
         s2 = mm.add_store(Store(name="S2", owner="O2"))
-        created = mm.add_camera(Camera(store_id=s1.store_id))
+        created = mm.add_camera(Camera(store_id=s1.store_id, relative_file_path="old/path.mp4"))
         updated = mm.update_camera(
-            Camera(camera_id=created.camera_id, store_id=s2.store_id)
+            Camera(camera_id=created.camera_id, store_id=s2.store_id, relative_file_path="new/path.mp4")
         )
         self.assertEqual(updated.store_id, s2.store_id)
+        self.assertEqual(updated.relative_file_path, "new/path.mp4")
 
     def test_delete_camera(self):
         store = self._make_store()
