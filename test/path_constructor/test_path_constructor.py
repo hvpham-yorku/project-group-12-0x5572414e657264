@@ -136,6 +136,33 @@ class TestPathConstructor(PathTestCase):
         expected = [ [10,10], [15,18], [10,10], [10,10]]
         self.assertEqual(path, expected)
 
+    #test for negative coordinates(not allowed)
+    @patch("src.path_constructor.get_customer_path_points")
+    def test_negative_coordinates(self, mock_get_points):
+        customer_id = 401
+        start = datetime.now()
+
+        points = [
+            make_point(customer_id, -5, 3, start),
+            make_point(customer_id, 4, 8, start + timedelta(seconds=5)),
+        ]
+        mock_get_points.return_value = points
+        with self.assertRaises(ValueError):
+            construct_path(customer_id)
+
+    #test for duplicate timestamps with different path points for one customer
+    @patch("src.path_constructor.get_customer_path_points")
+    def test_duplicate_timestamps(self, mock_get_points):
+        customer_id = 402
+        start = datetime.now()
+        points = [
+            make_point(customer_id, 1, 2, start),
+            make_point(customer_id, 5, 6, start),
+        ]
+        mock_get_points.return_value = points
+        with self.assertRaises(ValueError):
+            construct_path(customer_id)
+
 
 if __name__ == '__main__':
     unittest.main()
