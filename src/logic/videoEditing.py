@@ -15,6 +15,9 @@ def crop_video_opencv(input_path, output_path, x, y, width, height):
     tell NumPy which rows (y-coordinates) and columns (x-coordinates) you want
     to keep: frame[y:y+height, x:x+width].
 
+    # --- Example Usage ---
+    # crop_video_opencv('input.mp4', 'output_cropped.mp4', x=100, y=50, width=640, height=480)
+
     Parameters:
     - input_path (str): Path to the source video.
     - output_path (str): Path to save the cropped video.
@@ -63,5 +66,44 @@ def crop_video_opencv(input_path, output_path, x, y, width, height):
     print("Cropping complete!")
 
 
-# --- Example Usage ---
-# crop_video_opencv('input.mp4', 'output_cropped.mp4', x=100, y=50, width=640, height=480)
+import cv2
+
+
+def extract_first_frame(input_path, output_image_path):
+    """
+    Extracts the first frame from a video and saves it as an image.
+
+    # --- Example Usage ---
+    # extract_first_frame('input.mp4', 'reference_frame.jpg')
+
+
+    Parameters:
+    - input_path (str): Path to the source video.
+    - output_image_path (str): Path to save the extracted image (e.g., 'frame.jpg').
+
+    Returns:
+    - bool: True if successful, False otherwise.
+    """
+    # 1. Open the video file
+    cap = cv2.VideoCapture(input_path)
+
+    if not cap.isOpened():
+        print(f"Error: Could not open video file {input_path}")
+        return False
+
+    # 2. Read the very first frame
+    # cap.read() returns a tuple: a boolean (success) and the image array (frame)
+    success, frame = cap.read()
+
+    # 3. Clean up immediately since we only need the one frame
+    cap.release()
+
+    # 4. Save the frame to disk if it was read successfully
+    if success:
+        # cv2.imwrite automatically determines the format (jpg, png) from the file extension
+        cv2.imwrite(output_image_path, frame)
+        print(f"Success! First frame saved to: {output_image_path}")
+        return True
+    else:
+        print("Error: Could not read the first frame from the video.")
+        return False

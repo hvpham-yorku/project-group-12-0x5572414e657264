@@ -3,6 +3,7 @@ import subprocess
 
 testsToRun = [
     "test.logic.test_videoEditing_VideoCropper",
+    "test.logic.test_videoEditing_FirstFrameExtractor",
 ]
 
 
