@@ -1,5 +1,10 @@
+import os
+import tempfile
 import unittest
+
+import cv2
 import numpy as np
+
 from src.logic import mediaEditor
 
 
@@ -7,21 +12,29 @@ class TestMergeAndBlendImages(unittest.TestCase):
 
     def setUp(self):
         """Sets up basic dummy images to use across multiple tests."""
+        self.temp_dir = tempfile.TemporaryDirectory()
+
         # Create two 50x50 solid color blocks.
         # We use values of 100 and 200 because they average perfectly to 150.
         self.img1 = np.full((50, 50, 3), 100, dtype=np.uint8)
         self.img2 = np.full((50, 50, 3), 200, dtype=np.uint8)
 
+        self.img1_path = os.path.join(self.temp_dir.name, "img1.png")
+        self.img2_path = os.path.join(self.temp_dir.name, "img2.png")
+        cv2.imwrite(self.img1_path, self.img1)
+        cv2.imwrite(self.img2_path, self.img2)
+        self.output_path = os.path.join(self.temp_dir.name, "merged.png")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
     def test_negative_coordinates_raises_error(self):
         """Tests that the function immediately throws a ValueError for negative coordinates."""
-        images = [self.img1, self.img2]
-
-        # The second coordinate has a negative Y value
+        image_paths = [self.img1_path, self.img2_path]
         coords = [(0, 0), (50, -10)]
 
-        # We assert that calling the function with these arguments raises a ValueError
         with self.assertRaises(ValueError) as context:
-            mediaEditor.merge_and_blend_images(images, coords)
+            mediaEditor.merge_and_blend_images(image_paths, coords, self.output_path)
 
         self.assertIn(
             "YOUR X AND Y COORDS MUST ALL BE ABOVE OR EQUAL TO 0",
@@ -30,10 +43,12 @@ class TestMergeAndBlendImages(unittest.TestCase):
 
     def test_mismatched_lists_returns_none(self):
         """Tests that passing different sized lists returns None."""
-        images = [self.img1, self.img2]
-        coords = [(0, 0)]  # Only one coordinate for two images
+        image_paths = [self.img1_path, self.img2_path]
+        coords = [(0, 0)]
 
-        result = mediaEditor.merge_and_blend_images(images, coords)
+        result = mediaEditor.merge_and_blend_images(
+            image_paths, coords, self.output_path
+        )
 
         self.assertIsNone(
             result, "Function should return None when list lengths mismatch."
@@ -41,11 +56,12 @@ class TestMergeAndBlendImages(unittest.TestCase):
 
     def test_successful_side_by_side_merge(self):
         """Tests merging two images with zero overlap."""
-        images = [self.img1, self.img2]
-        # Place the second image exactly to the right of the first
+        image_paths = [self.img1_path, self.img2_path]
         coords = [(0, 0), (50, 0)]
 
-        result = mediaEditor.merge_and_blend_images(images, coords)
+        result = mediaEditor.merge_and_blend_images(
+            image_paths, coords, self.output_path
+        )
 
         # The new canvas should be 50 pixels high and 100 pixels wide (50 + 50)
         self.assertEqual(result.shape, (50, 100, 3))
@@ -58,11 +74,12 @@ class TestMergeAndBlendImages(unittest.TestCase):
 
     def test_successful_overlap_blending(self):
         """Tests that overlapping pixels are mathematically averaged correctly."""
-        images = [self.img1, self.img2]
-        # Shift the second image so it overlaps the right half of the first image
+        image_paths = [self.img1_path, self.img2_path]
         coords = [(0, 0), (25, 0)]
 
-        result = mediaEditor.merge_and_blend_images(images, coords)
+        result = mediaEditor.merge_and_blend_images(
+            image_paths, coords, self.output_path
+        )
 
         # The new canvas width should be 75 (img1 takes 0-50, img2 takes 25-75)
         self.assertEqual(result.shape, (50, 75, 3))
