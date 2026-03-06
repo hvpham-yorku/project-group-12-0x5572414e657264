@@ -3,7 +3,6 @@ import dearpygui.dearpygui as dpg
 from src.themes import themes
 from src.pages import mainWindow
 from src.pages import menuBar
-from src.pages import cameraFeed
 
 
 def main():
@@ -29,7 +28,6 @@ def main():
     dpg.show_viewport()
 
     try:
-        # Run the application while updating the live camera feed.
         while dpg.is_dearpygui_running():
             dpg.render_dearpygui_frame()
     finally:
