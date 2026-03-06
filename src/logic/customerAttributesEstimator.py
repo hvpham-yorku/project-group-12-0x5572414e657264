@@ -3,7 +3,11 @@ Customer check-out age, sex, and race estimator.
 """
 
 from __future__ import annotations
+from src.database.model_managers import get_customer_by_id, update_customer
+
 import cv2                 # [NEW COMMENT] OpenCV library used for image processing and neural network inference
+
+
 
 ageList=['(0-2)', '(4-6)', '(8-12)', '(15-20)', '(25-32)', '(38-43)', '(48-53)', '(60-100)']
 # [NEW COMMENT] Age categories predicted by the pretrained age model
@@ -85,7 +89,7 @@ def highlightFace(net, frame, conf_threshold=0.7):
 
 
 
-def estimateAttributes(image_path):
+def estimateAttributes(image_path, id):
 
     frame = cv2.imread(image_path)
 # [NEW COMMENT]
@@ -136,9 +140,18 @@ def estimateAttributes(image_path):
 # [NEW COMMENT] Select the predicted age group with the highest probability
 
 
-   
-    return age, gender
 
+    customer = get_customer_by_id(id)   # existing customer_id
+    if customer is not None:
+        customer.age = age[1:-1]
+        customer.sex = gender
+        updated_customer = update_customer(customer)
+
+   
+    return age, gender #return age and gender for now for unit testing
+
+"""
+ 
 image = "src/assets/faces/m1(0406).jpg"
 
 age, gender = estimateAttributes(image)
@@ -148,4 +161,4 @@ print(f'Gender: {gender}')
 # [NEW COMMENT] Print gender prediction to console
 print(f'Age: {age[1:-1]} years')
 # [NEW COMMENT] Print age prediction (removes parentheses from label)
- 
+"""
