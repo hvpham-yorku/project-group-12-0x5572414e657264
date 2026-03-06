@@ -309,6 +309,10 @@ def get_cameras_by_store(store_id: int) -> List[Camera]:
     ]
 
 
+def get_all_cameras() -> List[Camera]:
+    return [_row_to_camera(r) for r in CameraTable.select()]
+
+
 def update_camera(camera: Camera) -> Optional[Camera]:
     rows = (
         CameraTable.update(
