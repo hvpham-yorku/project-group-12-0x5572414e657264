@@ -1,6 +1,5 @@
 import dearpygui.dearpygui as dpg
 from src.themes.themes import *
-from src.pages import cameraFeed
 from src.pages import salesDataWindow
 from src.pages import logWindow
 
