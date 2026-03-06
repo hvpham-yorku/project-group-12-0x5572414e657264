@@ -5,9 +5,6 @@ import os
 import tempfile
 from src.logic import mediaEditor
 
-# Assuming the function is defined in a file named video_tools.py
-# from video_tools import extract_first_frame
-
 
 class TestFirstFrameExtractor(unittest.TestCase):
 
