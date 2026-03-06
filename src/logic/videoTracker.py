@@ -1,45 +1,32 @@
 """
-Video-based people tracking using YOLOv8 (ONNX Runtime) person detection
-and greedy nearest-neighbour matching for frame-to-frame data association.
+Video-based people tracking using OpenCV background subtraction
+and the Hungarian algorithm for frame-to-frame data association.
 
 Pipeline
 --------
-1.  ``detect_people_in_frame`` – runs a YOLOv8 ONNX model on a single
-    frame and returns centroid + bounding-box detections for every person.
+1.  ``detect_people_in_frame`` – runs MOG2 background subtraction on a
+    single frame and returns centroid + bounding-box detections.
 2.  ``track_people_in_video`` – iterates every frame of a video file,
     feeds each into (1), then stitches detections across frames into
     coherent per-person trajectories via Kalman-predicted positions and
-    greedy cost-matrix matching.
+    the Hungarian (Kuhn–Munkres) assignment algorithm.
 3.  ``save_tracked_paths`` – converts the tracked trajectories into
     ``Customer`` and ``Path`` model objects and persists them through
     the existing ``model_managers`` layer.
-
-Dependencies: opencv-python, numpy, onnxruntime  (no scipy, no ultralytics)
 """
 
 from __future__ import annotations
 
-import os
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-import onnxruntime as ort
+from scipy.optimize import linear_sum_assignment
 
 from src.database.models import Customer, Path
 from src.database import model_managers
-
-_COCO_PERSON_CLASS = 0
-_MODEL_INPUT_SIZE = 640
-_MODEL_URL = (
-    "https://huggingface.co/inference4j/yolov8n/resolve/main/yolov8n.onnx"
-)
-_DEFAULT_MODEL_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "assets", "yolov8n.onnx",
-)
 
 
 # ---------------------------------------------------------------------------
@@ -71,121 +58,6 @@ class PersonTrack:
 
 
 # ---------------------------------------------------------------------------
-# ONNX model management
-# ---------------------------------------------------------------------------
-
-def _ensure_model(model_path: str) -> str:
-    """Return *model_path* if it already exists, otherwise download it."""
-    if os.path.isfile(model_path):
-        return model_path
-
-    directory = os.path.dirname(model_path)
-    if directory:
-        os.makedirs(directory, exist_ok=True)
-
-    print(f"Downloading YOLOv8n ONNX model to '{model_path}' ...")
-    try:
-        urllib.request.urlretrieve(_MODEL_URL, model_path)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Auto-download failed ({exc}).\n"
-            f"Please download yolov8n.onnx manually from:\n"
-            f"  {_MODEL_URL}\n"
-            f"and place it at: {model_path}"
-        ) from exc
-
-    print("Download complete.")
-    return model_path
-
-
-# ---------------------------------------------------------------------------
-# YOLO pre-processing / post-processing
-# ---------------------------------------------------------------------------
-
-def _preprocess(frame: np.ndarray) -> Tuple[np.ndarray, float, int, int]:
-    """Letterbox-resize *frame* to 640x640 and build the ONNX input blob.
-
-    Returns ``(blob, scale, pad_w, pad_h)`` so post-processing can map
-    coordinates back to the original frame.
-    """
-    h, w = frame.shape[:2]
-    scale = min(_MODEL_INPUT_SIZE / w, _MODEL_INPUT_SIZE / h)
-    new_w, new_h = int(w * scale), int(h * scale)
-
-    resized = cv2.resize(frame, (new_w, new_h))
-
-    pad_w = (_MODEL_INPUT_SIZE - new_w) // 2
-    pad_h = (_MODEL_INPUT_SIZE - new_h) // 2
-    padded = np.full(
-        (_MODEL_INPUT_SIZE, _MODEL_INPUT_SIZE, 3), 114, dtype=np.uint8,
-    )
-    padded[pad_h:pad_h + new_h, pad_w:pad_w + new_w] = resized
-
-    blob = padded[:, :, ::-1].astype(np.float32) / 255.0   # BGR -> RGB + normalise
-    blob = np.ascontiguousarray(blob.transpose(2, 0, 1)[np.newaxis, ...])
-    return blob, scale, pad_w, pad_h
-
-
-def _postprocess(
-    output: np.ndarray,
-    scale: float,
-    pad_w: int,
-    pad_h: int,
-    conf_threshold: float,
-    iou_threshold: float,
-) -> List[Detection]:
-    """Parse the raw YOLO output tensor into ``Detection`` objects.
-
-    The model outputs shape ``(1, 84, 8400)`` -- 8 400 anchor proposals
-    each carrying 4 box values (cx, cy, w, h in 640-space) and 80 COCO
-    class scores.
-    """
-    preds = output[0].transpose()                       # (8400, 84)
-
-    class_scores = preds[:, 4:]
-    max_scores = class_scores.max(axis=1)
-    class_ids = class_scores.argmax(axis=1)
-
-    mask = (max_scores >= conf_threshold) & (class_ids == _COCO_PERSON_CLASS)
-    preds = preds[mask]
-    max_scores = max_scores[mask]
-
-    if len(preds) == 0:
-        return []
-
-    cx = preds[:, 0]
-    cy = preds[:, 1]
-    bw = preds[:, 2]
-    bh = preds[:, 3]
-
-    # Convert centre-format to top-left-format and map to original frame.
-    x = (cx - bw / 2 - pad_w) / scale
-    y = (cy - bh / 2 - pad_h) / scale
-    bw = bw / scale
-    bh = bh / scale
-
-    boxes = np.stack([x, y, bw, bh], axis=1)
-
-    indices = cv2.dnn.NMSBoxes(
-        boxes.tolist(), max_scores.tolist(), conf_threshold, iou_threshold,
-    )
-    if len(indices) == 0:
-        return []
-    indices = np.asarray(indices).flatten()
-
-    detections: List[Detection] = []
-    for i in indices:
-        bx, by, w, h = boxes[i]
-        detections.append(Detection(
-            x=int(bx + w / 2),
-            y=int(by + h / 2),
-            w=max(int(w), 0),
-            h=max(int(h), 0),
-        ))
-    return detections
-
-
-# ---------------------------------------------------------------------------
 # Internal Kalman-based track state
 # ---------------------------------------------------------------------------
 
@@ -206,6 +78,7 @@ class _KalmanTrack:
             [[1, 0, 0, 0],
              [0, 1, 0, 0]], dtype=np.float32,
         )
+        # position_new = position_old + velocity
         self.kf.transitionMatrix = np.array(
             [[1, 0, 1, 0],
              [0, 1, 0, 1],
@@ -239,24 +112,22 @@ class _KalmanTrack:
 
 def detect_people_in_frame(
     frame: np.ndarray,
-    session: ort.InferenceSession,
-    confidence: float = 0.5,
-    iou_threshold: float = 0.45,
+    bg_subtractor: cv2.BackgroundSubtractorMOG2,
+    min_contour_area: int = 500,
 ) -> List[Detection]:
-    """Detect people in *frame* using a YOLOv8 ONNX model.
+    """Detect people-sized blobs in *frame* using background subtraction.
 
     Parameters
     ----------
     frame:
         A BGR image (numpy array) read from a video or camera.
-    session:
-        A loaded ``onnxruntime.InferenceSession`` pointing at a YOLOv8
-        ONNX model.  Must be reused across calls to avoid reloading
-        weights every frame.
-    confidence:
-        Minimum detection confidence.  Boxes below this score are dropped.
-    iou_threshold:
-        IoU threshold for Non-Maximum Suppression.
+    bg_subtractor:
+        A *shared* ``cv2.BackgroundSubtractorMOG2`` instance that must be
+        reused across sequential frames so the background model stays
+        up-to-date.
+    min_contour_area:
+        Minimum contour area (in pixels) to be considered a person.
+        Contours smaller than this are treated as noise and discarded.
 
     Returns
     -------
@@ -264,56 +135,43 @@ def detect_people_in_frame(
         One ``Detection`` per person found, carrying the centroid (x, y)
         and bounding-box dimensions (w, h).
     """
-    blob, scale, pad_w, pad_h = _preprocess(frame)
+    blurred = cv2.GaussianBlur(frame, (5, 5), 0)
+    fg_mask = bg_subtractor.apply(blurred)
 
-    input_name = session.get_inputs()[0].name
-    output_name = session.get_outputs()[0].name
-    output = session.run([output_name], {input_name: blob})[0]
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    # MOG2 marks shadows at 127; threshold keeps only definite foreground.
+    fg_mask = cv2.threshold(fg_mask, 200, 255, cv2.THRESH_BINARY)[1]
 
-    return _postprocess(output, scale, pad_w, pad_h, confidence, iou_threshold)
+    contours, _ = cv2.findContours(
+        fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE,
+    )
 
-
-# ---------------------------------------------------------------------------
-# Greedy nearest-neighbour matching (replaces scipy Hungarian)
-# ---------------------------------------------------------------------------
-
-def _greedy_match(
-    cost: np.ndarray,
-    max_distance: float,
-) -> List[Tuple[int, int]]:
-    """Return ``(row, col)`` pairs picked greedily by ascending cost.
-
-    Iterates every cell in the cost matrix from cheapest to most
-    expensive.  Each row and column is used at most once, and pairs
-    whose cost exceeds *max_distance* are skipped.
-    """
-    if cost.size == 0:
-        return []
-    n_rows, n_cols = cost.shape
-    order = np.argsort(cost, axis=None)
-    matched: List[Tuple[int, int]] = []
-    used_rows: set = set()
-    used_cols: set = set()
-    for flat in order:
-        r, c = divmod(int(flat), n_cols)
-        if r in used_rows or c in used_cols:
+    detections: List[Detection] = []
+    for contour in contours:
+        if cv2.contourArea(contour) < min_contour_area:
             continue
-        if cost[r, c] > max_distance:
-            break
-        matched.append((r, c))
-        used_rows.add(r)
-        used_cols.add(c)
-        if len(used_rows) == n_rows or len(used_cols) == n_cols:
-            break
-    return matched
+        bx, by, bw, bh = cv2.boundingRect(contour)
+        detections.append(Detection(
+            x=bx + bw // 2,
+            y=by + bh // 2,
+            w=bw,
+            h=bh,
+        ))
+    return detections
 
+
+# ---------------------------------------------------------------------------
+# Hungarian-algorithm matching helper
+# ---------------------------------------------------------------------------
 
 def _match_detections_to_tracks(
     tracks: Dict[int, _KalmanTrack],
     detections: List[Detection],
     max_distance: float,
 ) -> Tuple[List[Tuple[int, int]], List[int], List[int]]:
-    """Assign new detections to existing tracks via greedy matching.
+    """Optimally assign new detections to existing tracks.
 
     Returns
     -------
@@ -340,11 +198,17 @@ def _match_detections_to_tracks(
         for j, det in enumerate(detections):
             cost[i, j] = np.hypot(px - det.x, py - det.y)
 
-    pairs = _greedy_match(cost, max_distance)
+    row_idx, col_idx = linear_sum_assignment(cost)
 
-    matched = [(track_ids[r], c) for r, c in pairs]
-    matched_tids = {track_ids[r] for r, _ in pairs}
-    matched_dets = {c for _, c in pairs}
+    matched: List[Tuple[int, int]] = []
+    matched_tids: set = set()
+    matched_dets: set = set()
+
+    for r, c in zip(row_idx, col_idx):
+        if cost[r, c] <= max_distance:
+            matched.append((track_ids[r], c))
+            matched_tids.add(track_ids[r])
+            matched_dets.add(c)
 
     unmatched_tracks = [t for t in track_ids if t not in matched_tids]
     unmatched_detections = [j for j in range(len(detections)) if j not in matched_dets]
@@ -358,11 +222,10 @@ def _match_detections_to_tracks(
 def track_people_in_video(
     video_path: str,
     video_start_time: Optional[datetime] = None,
-    model_path: str = _DEFAULT_MODEL_PATH,
-    confidence: float = 0.5,
-    iou_threshold: float = 0.45,
+    min_contour_area: int = 500,
     max_match_distance: float = 50.0,
-    max_frames_lost: int = 30,
+    max_frames_lost: int = 15,
+    warmup_frames: int = 30,
     min_track_length: int = 5,
 ) -> List[PersonTrack]:
     """Process every frame of *video_path* and return per-person paths.
@@ -376,19 +239,17 @@ def track_people_in_video(
         position is time-stamped as
         ``video_start_time + frame_number / fps``.
         Defaults to ``datetime.now()`` when *None*.
-    model_path:
-        Path to a YOLOv8 ``.onnx`` model file.  If the file does not
-        exist it will be auto-downloaded (~13 MB) on first use.
-    confidence:
-        Minimum YOLO detection confidence for a person box to be kept.
-    iou_threshold:
-        IoU threshold for Non-Maximum Suppression.
+    min_contour_area:
+        Forwarded to ``detect_people_in_frame``.
     max_match_distance:
         Maximum pixel distance between a Kalman prediction and a
         detection for the pair to be considered a valid match.
     max_frames_lost:
         How many consecutive frames a track may go unmatched before
         it is finalized and removed from the active set.
+    warmup_frames:
+        Number of initial frames used exclusively to train the MOG2
+        background model (no detections are produced during warmup).
     min_track_length:
         Tracks with fewer positions than this are discarded as noise.
 
@@ -406,10 +267,10 @@ def track_people_in_video(
         raise FileNotFoundError(f"Cannot open video file: {video_path}")
 
     fps: float = cap.get(cv2.CAP_PROP_FPS) or 30.0
-
-    resolved = _ensure_model(model_path)
-    session = ort.InferenceSession(
-        resolved, providers=["CPUExecutionProvider"],
+    bg_sub = cv2.createBackgroundSubtractorMOG2(
+        history=500,
+        varThreshold=50,
+        detectShadows=True,
     )
 
     active: Dict[int, _KalmanTrack] = {}
@@ -425,7 +286,12 @@ def track_people_in_video(
         timestamp = video_start_time + timedelta(seconds=frame_idx / fps)
         frame_idx += 1
 
-        dets = detect_people_in_frame(frame, session, confidence, iou_threshold)
+        # Let MOG2 learn the background before we start detecting.
+        if frame_idx <= warmup_frames:
+            bg_sub.apply(frame)
+            continue
+
+        dets = detect_people_in_frame(frame, bg_sub, min_contour_area)
 
         matched, lost_tids, new_det_idxs = _match_detections_to_tracks(
             active, dets, max_match_distance,

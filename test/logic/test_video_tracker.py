@@ -39,7 +39,7 @@ _PALETTE: List[Tuple[int, int, int]] = [
     (240, 240, 70),  # cyan
     (230, 50, 240),  # magenta
     (60, 245, 210),  # lime
-    (212, 190, 250),  # pink
+    (212, 190, 250), # pink
 ]
 
 
