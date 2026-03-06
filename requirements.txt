@@ -1,6 +1,6 @@
 dearpygui
 opencv-python
 numpy
-scipy
+onnxruntime
 PyInstaller
 peewee
