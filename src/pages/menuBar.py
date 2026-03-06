@@ -7,7 +7,7 @@ from src.pages import logWindow
 CAMERA_SELECT_MENU_TAG = "camera_select_menu"
 
 
-def print_me(sender):
+def feature_not_implemented(sender):
     print(f"Menu Item: {sender}")
     logWindow.addLog(0, "THIS FEATURE IS NOT YET IMPLEMENTED")
 
@@ -66,14 +66,18 @@ def refresh_camera_list(sender=None, app_data=None, user_data=None):
 def menuBar():
     with dpg.viewport_menu_bar():
         with dpg.menu(label="File"):
-            dpg.add_menu_item(label="Nothing Here Yet", callback=print_me)
-            # dpg.add_menu_item(label="Save", callback=print_me)
-            # dpg.add_menu_item(label="Save As", callback=print_me)
+            dpg.add_menu_item(
+                label="Nothing Here Yet", callback=feature_not_implemented
+            )
+            # dpg.add_menu_item(label="Save", callback=feature_not_implemented)
+            # dpg.add_menu_item(label="Save As", callback=feature_not_implemented)
 
             with dpg.menu(label="Settings"):
-                dpg.add_menu_item(label="Nothing Here Yet", callback=print_me)
-                # dpg.add_menu_item(label="Setting 1", callback=print_me, check=True)
-                # dpg.add_menu_item(label="Setting 2", callback=print_me)
+                dpg.add_menu_item(
+                    label="Nothing Here Yet", callback=feature_not_implemented
+                )
+                # dpg.add_menu_item(label="Setting 1", callback=feature_not_implemented, check=True)
+                # dpg.add_menu_item(label="Setting 2", callback=feature_not_implemented)
 
         with dpg.menu(label="View"):
             with dpg.menu(label="Themes"):
@@ -93,6 +97,6 @@ def menuBar():
             with dpg.menu(label="Select Camera", tag=CAMERA_SELECT_MENU_TAG):
                 dpg.add_menu_item(label="Scanning...", enabled=False)
 
-        dpg.add_menu_item(label="Help", callback=print_me)
+        dpg.add_menu_item(label="Help", callback=feature_not_implemented)
 
     refresh_camera_list()
