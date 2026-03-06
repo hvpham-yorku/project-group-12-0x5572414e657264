@@ -33,7 +33,9 @@ def construct_path(customer_id):
         #negative coordinates not allowed
         if p.location_x < 0 or p.location_y < 0:
             raise ValueError("Negative coordinates not allowed")
-
+        if p.timestamp in timestamps:
+            raise ValueError("Duplicate timestamp not allowed")
+        timestamps.add(p.timestamp)
     sorted_points = sort_path_points(points)
 
     path = convert_to_coordinates(sorted_points)

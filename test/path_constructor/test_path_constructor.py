@@ -163,6 +163,18 @@ class TestPathConstructor(PathTestCase):
         with self.assertRaises(ValueError):
             construct_path(customer_id)
 
+    @patch("src.path_constructor.get_customer_path_points")
+    def test_duplicate_timestamps_2(self, mock_get_points):
+        customer_id = 403
+        start = datetime.now()
+        points = [
+            make_point(customer_id, 1, 2, start),
+            make_point(customer_id, 1, 2, start),
+        ]
+        mock_get_points.return_value = points
+        with self.assertRaises(ValueError):
+            construct_path(customer_id)
+
 
 if __name__ == '__main__':
     unittest.main()
