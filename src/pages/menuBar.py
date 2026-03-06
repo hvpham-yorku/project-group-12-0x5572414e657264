@@ -86,17 +86,6 @@ def menuBar():
                 dpg.add_menu_item(label="Default", callback=set_default_theme)
                 dpg.add_menu_item(label="Retro", callback=set_retro)
 
-        # with dpg.menu(label="Camera"):
-        #     dpg.add_menu_item(
-        #         label="Show Live Feed",
-        #         check=True,
-        #         default_value=True,
-        #         callback=cameraFeed.toggle_camera_feed_window,
-        #     )
-        #     dpg.add_menu_item(label="Refresh Cameras", callback=refresh_camera_list)
-        #     with dpg.menu(label="Select Camera", tag=CAMERA_SELECT_MENU_TAG):
-        #         dpg.add_menu_item(label="Scanning...", enabled=False)
-
         dpg.add_menu_item(label="Help", callback=feature_not_implemented)
 
     refresh_camera_list()
