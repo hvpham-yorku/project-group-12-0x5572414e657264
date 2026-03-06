@@ -3,6 +3,7 @@ import dearpygui.dearpygui as dpg
 from src.database.model_managers import add_store
 from src.database.models import Store
 from src.pages import cameraZoneWindow
+from src.pages import cameraMergeWindow
 from src.pages import logWindow
 
 WINDOW_TAG = "add_store_popup"
@@ -27,6 +28,7 @@ def _create_store(sender, app_data, user_data) -> None:
         store = add_store(Store(name=name, owner=owner))
         logWindow.addLog(0, f"Created store {store.store_id}: {store.name}")
         cameraZoneWindow.refresh_store_dropdowns()
+        cameraMergeWindow.refresh_store_dropdown()
         _close_popup()
     except Exception as exc:
         logWindow.addLog(2, f"Failed to create store: {exc}")
@@ -42,7 +44,7 @@ def open_add_store_popup() -> None:
         label="Add Store",
         modal=True,
         no_resize=True,
-        width=360,
+        width=450,
         height=170,
     ):
         dpg.add_text("Enter store details")

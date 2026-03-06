@@ -4,7 +4,11 @@ import cv2
 import numpy as np
 import dearpygui.dearpygui as dpg
 
-from src.database.model_managers import get_aisles_by_store, get_all_stores
+from src.database.model_managers import (
+    get_aisles_by_store,
+    get_all_stores,
+    get_cameras_by_store,
+)
 from src.database.model_managers import add_aisle, delete_aisle
 from src.database.models import Aisle
 from src.pages import logWindow
@@ -21,6 +25,8 @@ ZONE_LIST_TAG = "camera_zone_list"
 PREVIEW_TEXTURE_TAG = "camera_zone_preview_texture"
 PREVIEW_TEXTURE_REGISTRY_TAG = "camera_zone_texture_registry"
 PREVIEW_IMAGE_WIDGET_TAG = "camera_zone_preview_image"
+PREVIEW_TEX_WIDTH = 640
+PREVIEW_TEX_HEIGHT = 360
 
 DEFAULT_ZONE_SIZE = (120, 90)
 MOVE_STEP = 10
@@ -30,18 +36,22 @@ ZONES: list[dict[str, int]] = []
 SELECTED_ZONE_INDEX = 0
 SELECTED_VIDEO_PATH: str | None = None
 STORE_LABEL_TO_ID: dict[str, int] = {}
+VIDEO_LABEL_TO_PATH: dict[str, str] = {}
 
 
-def _list_database_videos() -> list[str]:
-    if not os.path.isdir(DATABASE_VIDEOS_DIR):
+def _list_database_videos(store_id: int | None) -> list[str]:
+    VIDEO_LABEL_TO_PATH.clear()
+    if store_id is None:
         return []
-    allowed = {".mp4", ".mov", ".avi", ".mkv"}
-    files = [
-        f
-        for f in os.listdir(DATABASE_VIDEOS_DIR)
-        if os.path.splitext(f)[1].lower() in allowed
-    ]
-    return sorted(files)
+    cameras = get_cameras_by_store(store_id)
+    labels: list[str] = []
+    for cam in cameras:
+        if not cam.relative_file_path:
+            continue
+        label = f"{cam.camera_id} - {os.path.basename(cam.relative_file_path)}"
+        labels.append(label)
+        VIDEO_LABEL_TO_PATH[label] = cam.relative_file_path
+    return labels
 
 
 def _get_store_options() -> list[str]:
@@ -86,7 +96,25 @@ def _set_selected_video_by_name(name: str | None) -> None:
     if not name:
         SELECTED_VIDEO_PATH = None
         return
-    SELECTED_VIDEO_PATH = os.path.join(DATABASE_VIDEOS_DIR, name)
+    if name in VIDEO_LABEL_TO_PATH:
+        SELECTED_VIDEO_PATH = VIDEO_LABEL_TO_PATH[name]
+    else:
+        SELECTED_VIDEO_PATH = os.path.join(DATABASE_VIDEOS_DIR, name)
+
+
+def _refresh_video_dropdown() -> None:
+    if not dpg.does_item_exist(VIDEO_DROPDOWN_TAG):
+        return
+    store_id = _get_selected_store_id()
+    video_options = _list_database_videos(store_id)
+    current = dpg.get_value(VIDEO_DROPDOWN_TAG)
+    default_video = video_options[0] if video_options else ""
+    dpg.configure_item(VIDEO_DROPDOWN_TAG, items=video_options)
+    dpg.set_value(
+        VIDEO_DROPDOWN_TAG,
+        current if current in video_options else default_video,
+    )
+    _set_selected_video_by_name(dpg.get_value(VIDEO_DROPDOWN_TAG) or None)
 
 
 def _zone_label(idx: int, zone: dict[str, int]) -> str:
@@ -129,8 +157,8 @@ def _ensure_preview_texture() -> None:
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
         return
     dpg.add_dynamic_texture(
-        width=1,
-        height=1,
+        width=PREVIEW_TEX_WIDTH,
+        height=PREVIEW_TEX_HEIGHT,
         default_value=[0.0, 0.0, 0.0, 1.0],
         tag=PREVIEW_TEXTURE_TAG,
         parent=PREVIEW_TEXTURE_REGISTRY_TAG,
@@ -141,42 +169,25 @@ def _set_preview_texture_from_frame(frame: np.ndarray) -> None:
     _ensure_preview_texture()
 
     frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-    height, width = frame_rgba.shape[:2]
-    data = (frame_rgba.astype("float32") / 255.0).reshape(-1)
-
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
         config = dpg.get_item_configuration(PREVIEW_TEXTURE_TAG)
-        current_w = config.get("width", width)
-        current_h = config.get("height", height)
-        if current_w != width or current_h != height:
-            parent = (
-                dpg.get_item_parent(PREVIEW_IMAGE_WIDGET_TAG)
-                if dpg.does_item_exist(PREVIEW_IMAGE_WIDGET_TAG)
-                else None
-            )
-            if dpg.does_item_exist(PREVIEW_IMAGE_WIDGET_TAG):
-                dpg.delete_item(PREVIEW_IMAGE_WIDGET_TAG)
-            dpg.delete_item(PREVIEW_TEXTURE_TAG)
-            dpg.add_dynamic_texture(
-                width=width,
-                height=height,
-                default_value=data,
-                tag=PREVIEW_TEXTURE_TAG,
-                parent=PREVIEW_TEXTURE_REGISTRY_TAG,
-            )
-            if parent is not None:
-                dpg.add_image(
-                    PREVIEW_TEXTURE_TAG,
-                    tag=PREVIEW_IMAGE_WIDGET_TAG,
-                    parent=parent,
-                )
-                _resize_preview_to_window()
-        else:
-            dpg.set_value(PREVIEW_TEXTURE_TAG, data)
+        current_w = config.get("width", PREVIEW_TEX_WIDTH)
+        current_h = config.get("height", PREVIEW_TEX_HEIGHT)
+        target_w = max(1, int(current_w))
+        target_h = max(1, int(current_h))
+        frame_rgba = cv2.resize(
+            frame_rgba, (target_w, target_h), interpolation=cv2.INTER_AREA
+        )
+        data = (frame_rgba.astype("float32") / 255.0).reshape(-1)
+        dpg.set_value(PREVIEW_TEXTURE_TAG, data)
     else:
+        frame_rgba = cv2.resize(
+            frame_rgba, (PREVIEW_TEX_WIDTH, PREVIEW_TEX_HEIGHT), interpolation=cv2.INTER_AREA
+        )
+        data = (frame_rgba.astype("float32") / 255.0).reshape(-1)
         dpg.add_dynamic_texture(
-            width=width,
-            height=height,
+            width=PREVIEW_TEX_WIDTH,
+            height=PREVIEW_TEX_HEIGHT,
             default_value=data,
             tag=PREVIEW_TEXTURE_TAG,
             parent=PREVIEW_TEXTURE_REGISTRY_TAG,
@@ -215,7 +226,7 @@ def _update_preview() -> None:
         frame = _get_first_frame(video_path)
 
     if frame is None:
-        frame = np.zeros((360, 640, 3), dtype=np.uint8)
+        frame = np.zeros((PREVIEW_TEX_HEIGHT, PREVIEW_TEX_WIDTH, 3), dtype=np.uint8)
 
     for idx, zone in enumerate(ZONES):
         x = max(0, int(zone["x"]))
@@ -274,6 +285,7 @@ def callback_load_zones(sender, app_data, user_data):
     silent = isinstance(user_data, dict) and user_data.get("silent")
     if not silent:
         logWindow.addLog(0, f"Loaded {len(ZONES)} zones from store {store_id}.")
+    _refresh_video_dropdown()
 
 
 def callback_add_zone(sender, app_data, user_data):
@@ -281,11 +293,7 @@ def callback_add_zone(sender, app_data, user_data):
     global SELECTED_ZONE_INDEX
     SELECTED_ZONE_INDEX = len(ZONES) - 1
     _refresh_zone_list()
-    if store_options:
-        dpg.set_value(STORE_DROPDOWN_TAG, default_store)
-        callback_load_zones(None, None, {"silent": True})
-    else:
-        _update_preview()
+    _update_preview()
 
 
 def callback_remove_zone(sender, app_data, user_data):
@@ -354,10 +362,12 @@ def create_camera_zone_window():
 
     _ensure_preview_texture()
 
-    videos = _list_database_videos()
-    default_video = videos[0] if videos else ""
     store_options = _get_store_options()
     default_store = store_options[0] if store_options else ""
+    videos = _list_database_videos(
+        STORE_LABEL_TO_ID.get(default_store) if default_store else None
+    )
+    default_video = videos[0] if videos else ""
     _set_selected_video_by_name(default_video if default_video else None)
 
     with dpg.window(

@@ -9,6 +9,8 @@ from src.actions import videoImportDialog
 from src.logic import singleton
 from src.pages import logWindow
 from src.logic import mediaEditor
+from src.database.model_managers import get_all_stores, add_camera
+from src.database.models import Camera
 
 SINGLETON = singleton.Singleton()
 PREVIEW_IMAGE_PATH = os.path.join("assets", "pictures", "refPic.png")
@@ -17,6 +19,9 @@ PREVIEW_TEXTURE_TAG = "camera_merge_preview_texture"
 PREVIEW_TEXTURE_REGISTRY_TAG = "camera_merge_texture_registry"
 PREVIEW_IMAGE_WIDGET_TAG = "camera_merge_preview_image"
 DATABASE_VIDEOS_DIR = os.path.join("assets", "databaseVideos")
+STORE_DROPDOWN_TAG = "camera_merge_store_dropdown"
+STORE_PLACEHOLDER = "-- Select Store --"
+STORE_LABEL_TO_ID: dict[str, int] = {}
 
 
 def feature_not_implemented(sender):
@@ -87,12 +92,45 @@ def callback_video_import_dialog(sender, app_data, user_data):
     videoImportDialog.open_video_import_dialog(sender, app_data, user_data)
 
 
+def _get_store_options() -> list[str]:
+    stores = get_all_stores()
+    STORE_LABEL_TO_ID.clear()
+    options = [STORE_PLACEHOLDER]
+    for store in stores:
+        label = f"{store.store_id} - {store.name or 'Unnamed Store'}"
+        options.append(label)
+        STORE_LABEL_TO_ID[label] = store.store_id
+    return options
+
+
+def _get_selected_store_id() -> int | None:
+    if not dpg.does_item_exist(STORE_DROPDOWN_TAG):
+        return None
+    label = dpg.get_value(STORE_DROPDOWN_TAG)
+    return STORE_LABEL_TO_ID.get(label)
+
+
+def refresh_store_dropdown() -> None:
+    if not dpg.does_item_exist(STORE_DROPDOWN_TAG):
+        return
+    options = _get_store_options()
+    current = dpg.get_value(STORE_DROPDOWN_TAG)
+    dpg.configure_item(STORE_DROPDOWN_TAG, items=options)
+    dpg.set_value(
+        STORE_DROPDOWN_TAG,
+        current if current in options else STORE_PLACEHOLDER,
+    )
+
+
 def callback_merge_selected_videos(sender, app_data, user_data):
+    store_id = _get_selected_store_id()
+    if store_id is None:
+        logWindow.addLog(1, "Please select a store before pressing Done.")
+        return
+
     file_states = SINGLETON.get_selectedVideos()
     selected = [
-        (path, state["coor"])
-        for path, state in file_states.items()
-        if state["state"]
+        (path, state["coor"]) for path, state in file_states.items() if state["state"]
     ]
 
     if not selected:
@@ -108,6 +146,8 @@ def callback_merge_selected_videos(sender, app_data, user_data):
 
     try:
         mediaEditor.merge_and_blend_videos(video_paths, coordinates, output_path)
+        relative_path = os.path.relpath(output_path, os.getcwd())
+        add_camera(Camera(store_id=store_id, relative_file_path=relative_path))
         logWindow.addLog(0, f"Merged video saved to {output_path}")
     except Exception as exc:
         logWindow.addLog(2, f"Failed to merge videos: {exc}")
@@ -238,15 +278,24 @@ def create_camera_merge_window():
         height=450,
     ):
         dpg.add_text("Camera Video Feed Setup")
+        store_options = _get_store_options()
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label="Import Video File",
                 callback=videoImportDialog.open_video_import_dialog,
             )
+            dpg.add_text("Store:")
+            dpg.add_combo(
+                items=store_options,
+                default_value=STORE_PLACEHOLDER,
+                tag=STORE_DROPDOWN_TAG,
+                width=220,
+            )
             dpg.add_button(
-                label="Merge Selected Videos",
+                label="Done",
                 callback=callback_merge_selected_videos,
             )
+        refresh_store_dropdown()
         with dpg.table(
             tag="videoFiles",
             show=True,

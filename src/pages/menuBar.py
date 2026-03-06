@@ -7,6 +7,7 @@ from src.logic import singleton
 from src.actions import videoImportDialog
 from src.pages import cameraZoneWindow
 from src.pages import addStorePopup
+from src.pages import wipeDatabasePopup
 import os
 import tkinter as tk
 from tkinter import filedialog
@@ -50,6 +51,10 @@ def openAddStorePopup(sender, app_data, user_data):
     addStorePopup.open_add_store_popup()
 
 
+def openWipeDatabasePopup(sender, app_data, user_data):
+    wipeDatabasePopup.open_wipe_database_popup()
+
+
 def open_github_page(sender, app_data, user_data):
     """
     Opens the default web browser to a specific URL.
@@ -90,7 +95,7 @@ def menuBar():
             )
             dpg.add_menu_item(label="Create aisles for store", callback=openZoneWindow)
             dpg.add_menu_item(label="Add store", callback=openAddStorePopup)
-            dpg.add_menu_item(label="DATABASE WIPE", callback=feature_not_implemented)
+            dpg.add_menu_item(label="DATABASE WIPE", callback=openWipeDatabasePopup)
         with dpg.menu(label="View"):
             with dpg.menu(label="Themes"):
                 dpg.add_menu_item(label="Dark", callback=set_dark)
