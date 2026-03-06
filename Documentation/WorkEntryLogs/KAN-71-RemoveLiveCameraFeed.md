@@ -1,6 +1,7 @@
 ## Template:
 
-## Estimation: 30 Minutes
+## Estimation: 
+- 30 Minutes
 
 ## Work Entries:
 
