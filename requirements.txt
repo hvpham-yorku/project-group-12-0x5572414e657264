@@ -1,6 +1,7 @@
 dearpygui
 opencv-python
 numpy
+ultralytics
 PyInstaller
 peewee
 manim
