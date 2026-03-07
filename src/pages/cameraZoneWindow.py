@@ -27,6 +27,9 @@ PREVIEW_TEXTURE_REGISTRY_TAG = "camera_zone_texture_registry"
 PREVIEW_IMAGE_WIDGET_TAG = "camera_zone_preview_image"
 PREVIEW_TEX_WIDTH = 640
 PREVIEW_TEX_HEIGHT = 360
+PREVIEW_TEX_DATA = [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
+_PREVIEW_PENDING_DATA: list[float] | None = None
+_PREVIEW_UPDATE_SCHEDULED = False
 
 DEFAULT_ZONE_SIZE = (120, 90)
 MOVE_STEP = 10
@@ -159,7 +162,7 @@ def _ensure_preview_texture() -> None:
     dpg.add_dynamic_texture(
         width=PREVIEW_TEX_WIDTH,
         height=PREVIEW_TEX_HEIGHT,
-        default_value=[0.0, 0.0, 0.0, 1.0],
+        default_value=PREVIEW_TEX_DATA,
         tag=PREVIEW_TEXTURE_TAG,
         parent=PREVIEW_TEXTURE_REGISTRY_TAG,
     )
@@ -169,29 +172,37 @@ def _set_preview_texture_from_frame(frame: np.ndarray) -> None:
     _ensure_preview_texture()
 
     frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    frame_rgba = cv2.resize(
+        frame_rgba, (PREVIEW_TEX_WIDTH, PREVIEW_TEX_HEIGHT), interpolation=cv2.INTER_AREA
+    )
+    data = (frame_rgba.astype("float32") / 255.0).reshape(-1).tolist()
+    _queue_preview_update(data)
+
+
+def _queue_preview_update(data: list[float]) -> None:
+    global _PREVIEW_PENDING_DATA, _PREVIEW_UPDATE_SCHEDULED
+    if not dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
+        return
+    _PREVIEW_PENDING_DATA = data
+    if _PREVIEW_UPDATE_SCHEDULED:
+        return
+    _PREVIEW_UPDATE_SCHEDULED = True
+    frame = dpg.get_frame_count() + 1
+    dpg.set_frame_callback(frame, _apply_pending_preview)
+
+
+def _apply_pending_preview(sender=None, app_data=None):
+    global _PREVIEW_PENDING_DATA, _PREVIEW_UPDATE_SCHEDULED
+    _PREVIEW_UPDATE_SCHEDULED = False
+    if _PREVIEW_PENDING_DATA is None:
+        return
+    if len(_PREVIEW_PENDING_DATA) != len(PREVIEW_TEX_DATA):
+        _PREVIEW_PENDING_DATA = None
+        return
+    PREVIEW_TEX_DATA[:] = _PREVIEW_PENDING_DATA
+    _PREVIEW_PENDING_DATA = None
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
-        config = dpg.get_item_configuration(PREVIEW_TEXTURE_TAG)
-        current_w = config.get("width", PREVIEW_TEX_WIDTH)
-        current_h = config.get("height", PREVIEW_TEX_HEIGHT)
-        target_w = max(1, int(current_w))
-        target_h = max(1, int(current_h))
-        frame_rgba = cv2.resize(
-            frame_rgba, (target_w, target_h), interpolation=cv2.INTER_AREA
-        )
-        data = (frame_rgba.astype("float32") / 255.0).reshape(-1)
-        dpg.set_value(PREVIEW_TEXTURE_TAG, data)
-    else:
-        frame_rgba = cv2.resize(
-            frame_rgba, (PREVIEW_TEX_WIDTH, PREVIEW_TEX_HEIGHT), interpolation=cv2.INTER_AREA
-        )
-        data = (frame_rgba.astype("float32") / 255.0).reshape(-1)
-        dpg.add_dynamic_texture(
-            width=PREVIEW_TEX_WIDTH,
-            height=PREVIEW_TEX_HEIGHT,
-            default_value=data,
-            tag=PREVIEW_TEXTURE_TAG,
-            parent=PREVIEW_TEXTURE_REGISTRY_TAG,
-        )
+        dpg.set_value(PREVIEW_TEXTURE_TAG, PREVIEW_TEX_DATA)
 
 
 def _resize_preview_to_window() -> None:

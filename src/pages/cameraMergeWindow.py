@@ -28,6 +28,7 @@ STORE_PLACEHOLDER = "-- Select Store --"
 STORE_LABEL_TO_ID: dict[str, int] = {}
 PREVIEW_TEX_WIDTH = 1280
 PREVIEW_TEX_HEIGHT = 720
+PREVIEW_TEX_DATA = [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
 _PREVIEW_PENDING_DATA = None
 _PREVIEW_UPDATE_SCHEDULED = False
 
@@ -250,7 +251,7 @@ def create_camera_merge_window():
     if not dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
         data = _load_image_rgba(initial_preview)
         if data is None:
-            data = _black_texture_data()
+            data = PREVIEW_TEX_DATA
         dpg.add_dynamic_texture(
             width=PREVIEW_TEX_WIDTH,
             height=PREVIEW_TEX_HEIGHT,
@@ -379,7 +380,8 @@ def _load_image_rgba(image_path: str):
 
 
 def _black_texture_data() -> list[float]:
-    return [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
+    PREVIEW_TEX_DATA[:] = [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
+    return PREVIEW_TEX_DATA
 
 
 def _resize_for_preview(img):
@@ -413,5 +415,6 @@ def _apply_pending_preview(sender=None, app_data=None):
     if _PREVIEW_PENDING_DATA is None:
         return
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
-        dpg.set_value(PREVIEW_TEXTURE_TAG, _PREVIEW_PENDING_DATA)
+        PREVIEW_TEX_DATA[:] = _PREVIEW_PENDING_DATA
+        dpg.set_value(PREVIEW_TEXTURE_TAG, PREVIEW_TEX_DATA)
     _PREVIEW_PENDING_DATA = None
