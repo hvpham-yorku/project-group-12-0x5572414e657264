@@ -31,10 +31,8 @@ def main():
     try:
         # Run the application while updating the live camera feed.
         while dpg.is_dearpygui_running():
-            cameraFeed.update_camera_feed()
             dpg.render_dearpygui_frame()
     finally:
-        cameraFeed.shutdown_camera_feed()
         dpg.destroy_context()
 
 
