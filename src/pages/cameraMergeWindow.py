@@ -54,7 +54,7 @@ def callback_refresh_table_entries(sender, app_data, user_data):
     file_states = SINGLETON.get_selectedVideos()
     for file in SINGLETON.get_all_temp_files():
         with dpg.table_row(parent="videoFiles"):
-            dpg.add_text(f"{str(file).split("/")[-1]}")
+            dpg.add_text(f"{str(file).split('/')[-1]}")
             dpg.add_checkbox(
                 callback=callback_select_video_files,
                 default_value=file_states.get(file, {"state": False})["state"],
@@ -306,7 +306,7 @@ def create_camera_merge_window():
         file_states = SINGLETON.get_selectedVideos()
         for file in SINGLETON.get_all_temp_files():
             with dpg.table_row(parent="videoFiles"):
-                dpg.add_text(f"{str(file).split("/")[-1]}")
+                dpg.add_text(f"{str(file).split('/')[-1]}")
                 dpg.add_checkbox(
                     callback=callback_select_video_files,
                     default_value=file_states.get(file, {"state": False})["state"],
