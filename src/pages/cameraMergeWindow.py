@@ -28,6 +28,8 @@ STORE_PLACEHOLDER = "-- Select Store --"
 STORE_LABEL_TO_ID: dict[str, int] = {}
 PREVIEW_TEX_WIDTH = 1280
 PREVIEW_TEX_HEIGHT = 720
+_PREVIEW_PENDING_DATA = None
+_PREVIEW_UPDATE_SCHEDULED = False
 
 
 def feature_not_implemented(sender):
@@ -181,16 +183,7 @@ def _set_preview_texture(image_path: str) -> None:
     if data is None:
         return
 
-    if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
-        dpg.set_value(PREVIEW_TEXTURE_TAG, data)
-    else:
-        dpg.add_dynamic_texture(
-            width=PREVIEW_TEX_WIDTH,
-            height=PREVIEW_TEX_HEIGHT,
-            default_value=data,
-            tag=PREVIEW_TEXTURE_TAG,
-            parent=PREVIEW_TEXTURE_REGISTRY_TAG,
-        )
+    _queue_preview_update(data)
 
 
 def refreshMergedImage():
@@ -211,13 +204,16 @@ def refreshMergedImage():
 
     merged_output_path = os.path.join(out_dir, "merged_preview.png")
     if len(image_paths):
-        mediaEditor.merge_and_blend_images(
+        blended = mediaEditor.merge_and_blend_images(
             image_paths,
             image_coords,
             # [file_states[key]["coor"] for key in file_states.keys()],
             merged_output_path,
         )
-        _set_preview_texture(merged_output_path)
+        if blended is not None:
+            _queue_preview_update(_bgr_to_texture_data(blended))
+        else:
+            _set_preview_texture(merged_output_path)
     else:
         _set_preview_texture(_ensure_preview_image_file())
 
@@ -376,9 +372,7 @@ def _load_image_rgba(image_path: str):
     img = cv2.imread(image_path)
     if img is None:
         return None
-    img = cv2.resize(
-        img, (PREVIEW_TEX_WIDTH, PREVIEW_TEX_HEIGHT), interpolation=cv2.INTER_AREA
-    )
+    img = _resize_for_preview(img)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     data = (img.astype("float32") / 255.0).reshape(-1).tolist()
     return data
@@ -386,3 +380,38 @@ def _load_image_rgba(image_path: str):
 
 def _black_texture_data() -> list[float]:
     return [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
+
+
+def _resize_for_preview(img):
+    h, w = img.shape[:2]
+    if w < PREVIEW_TEX_WIDTH or h < PREVIEW_TEX_HEIGHT:
+        interp = cv2.INTER_LINEAR
+    else:
+        interp = cv2.INTER_AREA
+    return cv2.resize(img, (PREVIEW_TEX_WIDTH, PREVIEW_TEX_HEIGHT), interpolation=interp)
+
+
+def _bgr_to_texture_data(img):
+    img = _resize_for_preview(img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+    return (img.astype("float32") / 255.0).reshape(-1).tolist()
+
+
+def _queue_preview_update(data) -> None:
+    global _PREVIEW_PENDING_DATA, _PREVIEW_UPDATE_SCHEDULED
+    _PREVIEW_PENDING_DATA = data
+    if _PREVIEW_UPDATE_SCHEDULED:
+        return
+    _PREVIEW_UPDATE_SCHEDULED = True
+    frame = dpg.get_frame_count() + 1
+    dpg.set_frame_callback(frame, _apply_pending_preview)
+
+
+def _apply_pending_preview(sender=None, app_data=None):
+    global _PREVIEW_PENDING_DATA, _PREVIEW_UPDATE_SCHEDULED
+    _PREVIEW_UPDATE_SCHEDULED = False
+    if _PREVIEW_PENDING_DATA is None:
+        return
+    if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
+        dpg.set_value(PREVIEW_TEXTURE_TAG, _PREVIEW_PENDING_DATA)
+    _PREVIEW_PENDING_DATA = None
