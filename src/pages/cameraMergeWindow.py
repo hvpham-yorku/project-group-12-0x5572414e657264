@@ -415,6 +415,7 @@ def _apply_pending_preview(sender=None, app_data=None):
     if _PREVIEW_PENDING_DATA is None:
         return
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
-        PREVIEW_TEX_DATA[:] = _PREVIEW_PENDING_DATA
-        dpg.set_value(PREVIEW_TEXTURE_TAG, PREVIEW_TEX_DATA)
+        if len(_PREVIEW_PENDING_DATA) == len(PREVIEW_TEX_DATA):
+            PREVIEW_TEX_DATA[:] = _PREVIEW_PENDING_DATA
+            dpg.set_value(PREVIEW_TEXTURE_TAG, PREVIEW_TEX_DATA)
     _PREVIEW_PENDING_DATA = None

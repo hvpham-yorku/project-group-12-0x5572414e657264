@@ -103,22 +103,25 @@ class Singleton:
         Returns a list of all files in a folder as absolute paths.
 
         :param recursive: If True, searches all subfolders. If False, only the top folder.
-        :return: A list of Path objects (which can be easily converted to strings).
+        :return: A list of file path strings.
         """
-        # Convert string input to a Path object
-        path = Path(self._tempFolder)
+        path = self._tempFolder
+        if not os.path.isdir(path):
+            return []
 
-        # Check if the path exists and is a directory
-        if not path.is_dir():
-            return f"Error: {self._tempFolder} is not a valid directory."
-
-        # Use rglob('*') for recursive or glob('*') for top-level only
-        search_pattern = "**/*" if recursive else "*"
-
-        # Filter for files only (ignoring folders in the results)
-        files = [f.absolute() for f in path.glob(search_pattern) if f.is_file()]
-
-        files = [str(x) for x in files]
+        files: List[str] = []
+        try:
+            if recursive:
+                for root, _, filenames in os.walk(path):
+                    for name in filenames:
+                        files.append(os.path.join(root, name))
+            else:
+                with os.scandir(path) as it:
+                    for entry in it:
+                        if entry.is_file():
+                            files.append(entry.path)
+        except OSError:
+            return []
 
         for file in files:
             if file not in self._selectedVideos:
