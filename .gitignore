@@ -218,3 +218,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.db
+test/test_videos/test_1_tracked.mp4
+test/test_videos/test_1.mp4
