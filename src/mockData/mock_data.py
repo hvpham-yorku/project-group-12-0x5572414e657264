@@ -27,12 +27,12 @@ from src.database.model_managers import (
 )
 
 # initialize database
-initialize_db("store.db")
+# initialize_db("store.db")
 
 store = add_store(Store(name="SmartMart", owner="Anne"))
 
-add_camera(Camera(store_id=store.store_id))
-add_camera(Camera(store_id=store.store_id))
+# add_camera(Camera(store_id=store.store_id))
+# add_camera(Camera(store_id=store.store_id))
 
 aisle1 = add_aisle(
     Aisle(
