@@ -1,6 +1,5 @@
 import dearpygui.dearpygui as dpg
 from src.themes.themes import *
-from src.pages import cameraFeed
 from src.pages import salesDataWindow
 from src.pages import logWindow
 
@@ -46,6 +45,6 @@ def mainWindow(tag: str):
                 with dpg.table_cell(tag="cameraFeedCell"):  # LEFT PANEL
                     with dpg.child_window(border=True):
                         dpg.add_text("Empty Window")
-                    # cameraFeed.create_camera_feed_window()
+
                 with dpg.table_cell(tag="posDataCell"):  # RIGHT PANEL
                     salesDataWindow.create_sales_data_window("posDataCell")
