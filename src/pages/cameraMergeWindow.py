@@ -26,6 +26,8 @@ DATABASE_VIDEOS_DIR = SINGLETON.get_databaseVideoFolder()
 STORE_DROPDOWN_TAG = "camera_merge_store_dropdown"
 STORE_PLACEHOLDER = "-- Select Store --"
 STORE_LABEL_TO_ID: dict[str, int] = {}
+PREVIEW_TEX_WIDTH = 1280
+PREVIEW_TEX_HEIGHT = 720
 
 
 def feature_not_implemented(sender):
@@ -175,32 +177,16 @@ def _set_preview_texture(image_path: str) -> None:
     if not dpg.does_item_exist(PREVIEW_TEXTURE_REGISTRY_TAG):
         return
 
-    if not os.path.exists(image_path):
+    data = _load_image_rgba(image_path)
+    if data is None:
         return
-
-    loaded = _load_image_rgba(image_path)
-    if loaded is None:
-        return
-    width, height, data = loaded
 
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
-        config = dpg.get_item_configuration(PREVIEW_TEXTURE_TAG)
-        current_w = config.get("width", width)
-        current_h = config.get("height", height)
-        if current_w != width or current_h != height:
-            img = cv2.imread(image_path)
-            if img is None:
-                return
-            target_w = max(1, int(current_w))
-            target_h = max(1, int(current_h))
-            img = cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_AREA)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
-            data = (img.astype("float32") / 255.0).reshape(-1)
         dpg.set_value(PREVIEW_TEXTURE_TAG, data)
     else:
         dpg.add_dynamic_texture(
-            width=width,
-            height=height,
+            width=PREVIEW_TEX_WIDTH,
+            height=PREVIEW_TEX_HEIGHT,
             default_value=data,
             tag=PREVIEW_TEXTURE_TAG,
             parent=PREVIEW_TEXTURE_REGISTRY_TAG,
@@ -265,18 +251,13 @@ def create_camera_merge_window():
         if os.path.exists(MERGED_PREVIEW_PATH)
         else _ensure_preview_image_file()
     )
-    loaded = (
-        _load_image_rgba(initial_preview) if os.path.exists(initial_preview) else None
-    )
-    if loaded:
-        width, height, data = loaded
-    else:
-        width, height, data = 1, 1, [0.2, 0.2, 0.2, 1.0]
-
     if not dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
+        data = _load_image_rgba(initial_preview)
+        if data is None:
+            data = _black_texture_data()
         dpg.add_dynamic_texture(
-            width=width,
-            height=height,
+            width=PREVIEW_TEX_WIDTH,
+            height=PREVIEW_TEX_HEIGHT,
             default_value=data,
             tag=PREVIEW_TEXTURE_TAG,
             parent=PREVIEW_TEXTURE_REGISTRY_TAG,
@@ -390,10 +371,18 @@ def _ensure_preview_image_file() -> str:
 
 
 def _load_image_rgba(image_path: str):
+    if not os.path.exists(image_path):
+        return None
     img = cv2.imread(image_path)
     if img is None:
         return None
+    img = cv2.resize(
+        img, (PREVIEW_TEX_WIDTH, PREVIEW_TEX_HEIGHT), interpolation=cv2.INTER_AREA
+    )
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
-    height, width = img.shape[:2]
-    data = (img.astype("float32") / 255.0).reshape(-1)
-    return width, height, data
+    data = (img.astype("float32") / 255.0).reshape(-1).tolist()
+    return data
+
+
+def _black_texture_data() -> list[float]:
+    return [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
