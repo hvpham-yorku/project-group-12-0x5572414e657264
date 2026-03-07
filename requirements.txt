@@ -1,6 +1,6 @@
 dearpygui
 opencv-python
 numpy
-scipy
+ultralytics
 PyInstaller
 peewee

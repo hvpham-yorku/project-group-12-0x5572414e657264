@@ -1,18 +1,19 @@
 """
-Video-based people tracking using OpenCV background subtraction
-and the Hungarian algorithm for frame-to-frame data association.
+Video-based people tracking using Ultralytics YOLOv8 for person detection
+and ByteTrack for frame-to-frame data association.
 
 Pipeline
 --------
-1.  ``detect_people_in_frame`` – runs MOG2 background subtraction on a
-    single frame and returns centroid + bounding-box detections.
+1.  ``detect_people_in_frame`` – runs YOLOv8 on a single frame and returns
+    centroid + bounding-box detections for every person.
 2.  ``track_people_in_video`` – iterates every frame of a video file,
-    feeds each into (1), then stitches detections across frames into
-    coherent per-person trajectories via Kalman-predicted positions and
-    the Hungarian (Kuhn–Munkres) assignment algorithm.
+    runs YOLOv8 with ByteTrack persistence, and returns per-person
+    trajectories with stable IDs.
 3.  ``save_tracked_paths`` – converts the tracked trajectories into
     ``Customer`` and ``Path`` model objects and persists them through
     the existing ``model_managers`` layer.
+
+Dependencies: ultralytics, opencv-python, numpy
 """
 
 from __future__ import annotations
@@ -23,10 +24,12 @@ from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-from scipy.optimize import linear_sum_assignment
+from ultralytics import YOLO
 
 from src.database.models import Customer, Path
 from src.database import model_managers
+
+_COCO_PERSON_CLASS = 0
 
 
 # ---------------------------------------------------------------------------
@@ -58,76 +61,25 @@ class PersonTrack:
 
 
 # ---------------------------------------------------------------------------
-# Internal Kalman-based track state
-# ---------------------------------------------------------------------------
-
-class _KalmanTrack:
-    """Per-person Kalman filter wrapping OpenCV's KalmanFilter.
-
-    State vector  : [x, y, dx, dy]  (position + velocity)
-    Measurement   : [x, y]          (observed centroid)
-    """
-
-    def __init__(self, track_id: int, x: float, y: float) -> None:
-        self.track_id = track_id
-        self.frames_lost = 0
-        self.positions: List[TrackedPosition] = []
-
-        self.kf = cv2.KalmanFilter(4, 2)
-        self.kf.measurementMatrix = np.array(
-            [[1, 0, 0, 0],
-             [0, 1, 0, 0]], dtype=np.float32,
-        )
-        # position_new = position_old + velocity
-        self.kf.transitionMatrix = np.array(
-            [[1, 0, 1, 0],
-             [0, 1, 0, 1],
-             [0, 0, 1, 0],
-             [0, 0, 0, 1]], dtype=np.float32,
-        )
-        self.kf.processNoiseCov = np.eye(4, dtype=np.float32) * 1e-2
-        self.kf.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
-        self.kf.errorCovPost = np.eye(4, dtype=np.float32)
-        self.kf.statePost = np.array(
-            [[x], [y], [0], [0]], dtype=np.float32,
-        )
-
-    def predict(self) -> Tuple[float, float]:
-        """Advance the internal state by one time-step and return the
-        predicted (x, y) centroid."""
-        state = self.kf.predict().flatten()
-        return float(state[0]), float(state[1])
-
-    def correct(self, x: float, y: float) -> None:
-        """Feed an observed measurement back into the filter."""
-        self.kf.correct(
-            np.array([[x], [y]], dtype=np.float32),
-        )
-        self.frames_lost = 0
-
-
-# ---------------------------------------------------------------------------
 # Function 1 – single-frame detection
 # ---------------------------------------------------------------------------
 
 def detect_people_in_frame(
     frame: np.ndarray,
-    bg_subtractor: cv2.BackgroundSubtractorMOG2,
-    min_contour_area: int = 500,
+    model: YOLO,
+    confidence: float = 0.25,
 ) -> List[Detection]:
-    """Detect people-sized blobs in *frame* using background subtraction.
+    """Detect people in *frame* using YOLOv8.
 
     Parameters
     ----------
     frame:
         A BGR image (numpy array) read from a video or camera.
-    bg_subtractor:
-        A *shared* ``cv2.BackgroundSubtractorMOG2`` instance that must be
-        reused across sequential frames so the background model stays
-        up-to-date.
-    min_contour_area:
-        Minimum contour area (in pixels) to be considered a person.
-        Contours smaller than this are treated as noise and discarded.
+    model:
+        A loaded ``ultralytics.YOLO`` model instance.  Must be reused
+        across calls to avoid reloading weights every frame.
+    confidence:
+        Minimum detection confidence.  Boxes below this score are dropped.
 
     Returns
     -------
@@ -135,84 +87,132 @@ def detect_people_in_frame(
         One ``Detection`` per person found, carrying the centroid (x, y)
         and bounding-box dimensions (w, h).
     """
-    blurred = cv2.GaussianBlur(frame, (5, 5), 0)
-    fg_mask = bg_subtractor.apply(blurred)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel, iterations=2)
-    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-    # MOG2 marks shadows at 127; threshold keeps only definite foreground.
-    fg_mask = cv2.threshold(fg_mask, 200, 255, cv2.THRESH_BINARY)[1]
-
-    contours, _ = cv2.findContours(
-        fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE,
+    results = model.predict(
+        frame, classes=[_COCO_PERSON_CLASS], conf=confidence, verbose=False,
     )
-
     detections: List[Detection] = []
-    for contour in contours:
-        if cv2.contourArea(contour) < min_contour_area:
-            continue
-        bx, by, bw, bh = cv2.boundingRect(contour)
+    for box in results[0].boxes:
+        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+        w = int(x2 - x1)
+        h = int(y2 - y1)
         detections.append(Detection(
-            x=bx + bw // 2,
-            y=by + bh // 2,
-            w=bw,
-            h=bh,
+            x=int((x1 + x2) / 2),
+            y=int((y1 + y2) / 2),
+            w=w,
+            h=h,
         ))
     return detections
 
 
 # ---------------------------------------------------------------------------
-# Hungarian-algorithm matching helper
+# Post-processing – merge fragmented tracks
 # ---------------------------------------------------------------------------
 
-def _match_detections_to_tracks(
-    tracks: Dict[int, _KalmanTrack],
-    detections: List[Detection],
-    max_distance: float,
-) -> Tuple[List[Tuple[int, int]], List[int], List[int]]:
-    """Optimally assign new detections to existing tracks.
+def _on_edge(x: int, y: int, width: int, height: int,
+             margin_frac: float) -> bool:
+    """Return ``True`` if (x, y) is within *margin_frac* of a frame edge."""
+    mx = int(width * margin_frac)
+    my = int(height * margin_frac)
+    return x < mx or x > width - mx or y < my or y > height - my
 
-    Returns
-    -------
-    matched :
-        ``(track_id, detection_index)`` pairs that were accepted.
-    unmatched_track_ids :
-        Track IDs that received no detection this frame.
-    unmatched_det_indices :
-        Detection indices that matched no existing track (new people).
+
+def _merge_fragmented_tracks(
+    tracks: List[PersonTrack],
+    frame_width: int,
+    frame_height: int,
+    edge_margin: float = 0.10,
+) -> List[PersonTrack]:
+    """Stitch track fragments that belong to the same physical person.
+
+    Hard rule: people can only enter/exit through the frame edges.
+    Any track that *starts* in the middle of the frame is guaranteed
+    to be a continuation of someone already present, so it is always
+    merged with the best available predecessor — no hard distance or
+    time cutoffs.
+
+    Tracks are processed in chronological order.  Each group maintains
+    a running endpoint so that chained fragments (A → B → C) resolve
+    correctly.
+
+    Parameters
+    ----------
+    tracks:
+        Raw tracks from the YOLO + ByteTrack pass.
+    frame_width, frame_height:
+        Pixel dimensions of the video frame.
+    edge_margin:
+        Fraction of the frame considered "edge zone" (0.10 = 10%).
     """
-    if not tracks or not detections:
-        return (
-            [],
-            list(tracks.keys()),
-            list(range(len(detections))),
+    if len(tracks) <= 1:
+        return tracks
+
+    order = sorted(
+        range(len(tracks)),
+        key=lambda i: tracks[i].positions[0].timestamp
+        if tracks[i].positions else datetime.max,
+    )
+
+    # Each group: list of track indices, plus its latest endpoint.
+    groups: List[List[int]] = []
+    group_end_time: List[datetime] = []
+    group_end_xy: List[Tuple[int, int]] = []
+    group_end_on_edge: List[bool] = []
+
+    for idx in order:
+        t = tracks[idx]
+        if not t.positions:
+            continue
+
+        first = t.positions[0]
+        last = t.positions[-1]
+
+        starts_mid = not _on_edge(
+            first.x, first.y, frame_width, frame_height, edge_margin,
         )
 
-    track_ids = list(tracks.keys())
-    predictions = {tid: tracks[tid].predict() for tid in track_ids}
+        merged_into = None
+        if starts_mid and groups:
+            best_score = float("inf")
+            for g, _ in enumerate(groups):
+                if group_end_on_edge[g]:
+                    continue
+                gap = (first.timestamp - group_end_time[g]).total_seconds()
+                if gap < 0:
+                    continue
+                ex, ey = group_end_xy[g]
+                dist = float(np.hypot(first.x - ex, first.y - ey))
+                score = gap * 100.0 + dist
+                if score < best_score:
+                    best_score = score
+                    merged_into = g
 
-    cost = np.zeros((len(track_ids), len(detections)), dtype=np.float64)
-    for i, tid in enumerate(track_ids):
-        px, py = predictions[tid]
-        for j, det in enumerate(detections):
-            cost[i, j] = np.hypot(px - det.x, py - det.y)
+        if merged_into is not None:
+            groups[merged_into].append(idx)
+            group_end_time[merged_into] = last.timestamp
+            group_end_xy[merged_into] = (last.x, last.y)
+            group_end_on_edge[merged_into] = _on_edge(
+                last.x, last.y, frame_width, frame_height, edge_margin,
+            )
+        else:
+            groups.append([idx])
+            group_end_time.append(last.timestamp)
+            group_end_xy.append((last.x, last.y))
+            group_end_on_edge.append(_on_edge(
+                last.x, last.y, frame_width, frame_height, edge_margin,
+            ))
 
-    row_idx, col_idx = linear_sum_assignment(cost)
+    result: List[PersonTrack] = []
+    for grp in groups:
+        combined = PersonTrack(track_id=tracks[grp[0]].track_id)
+        for i in grp:
+            combined.positions.extend(tracks[i].positions)
+        combined.positions.sort(key=lambda p: p.timestamp)
+        result.append(combined)
 
-    matched: List[Tuple[int, int]] = []
-    matched_tids: set = set()
-    matched_dets: set = set()
-
-    for r, c in zip(row_idx, col_idx):
-        if cost[r, c] <= max_distance:
-            matched.append((track_ids[r], c))
-            matched_tids.add(track_ids[r])
-            matched_dets.add(c)
-
-    unmatched_tracks = [t for t in track_ids if t not in matched_tids]
-    unmatched_detections = [j for j in range(len(detections)) if j not in matched_dets]
-    return matched, unmatched_tracks, unmatched_detections
+    result.sort(
+        key=lambda t: t.positions[0].timestamp if t.positions else datetime.max,
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -222,13 +222,20 @@ def _match_detections_to_tracks(
 def track_people_in_video(
     video_path: str,
     video_start_time: Optional[datetime] = None,
-    min_contour_area: int = 500,
-    max_match_distance: float = 50.0,
-    max_frames_lost: int = 15,
-    warmup_frames: int = 30,
+    model_path: str = "yolov8n.pt",
+    confidence: float = 0.25,
     min_track_length: int = 5,
+    edge_margin: float = 0.10,
 ) -> List[PersonTrack]:
     """Process every frame of *video_path* and return per-person paths.
+
+    Uses YOLOv8 for person detection and ByteTrack for multi-object
+    tracking.  A post-processing pass then merges track fragments that
+    start in the middle of the frame (not at an edge), exploiting the
+    physical constraint that people can only enter or leave through the
+    frame borders.  Any mid-frame appearance is unconditionally merged
+    with the best available predecessor — there are no hard distance or
+    time cutoffs.
 
     Parameters
     ----------
@@ -239,19 +246,15 @@ def track_people_in_video(
         position is time-stamped as
         ``video_start_time + frame_number / fps``.
         Defaults to ``datetime.now()`` when *None*.
-    min_contour_area:
-        Forwarded to ``detect_people_in_frame``.
-    max_match_distance:
-        Maximum pixel distance between a Kalman prediction and a
-        detection for the pair to be considered a valid match.
-    max_frames_lost:
-        How many consecutive frames a track may go unmatched before
-        it is finalized and removed from the active set.
-    warmup_frames:
-        Number of initial frames used exclusively to train the MOG2
-        background model (no detections are produced during warmup).
+    model_path:
+        Path to a YOLOv8 model file.  Defaults to ``yolov8n.pt``
+        which is auto-downloaded on first use (~6 MB).
+    confidence:
+        Minimum YOLO detection confidence for a person box to be kept.
     min_track_length:
         Tracks with fewer positions than this are discarded as noise.
+    edge_margin:
+        Fraction of the frame considered "edge zone" (0.10 = 10%).
 
     Returns
     -------
@@ -267,15 +270,13 @@ def track_people_in_video(
         raise FileNotFoundError(f"Cannot open video file: {video_path}")
 
     fps: float = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    bg_sub = cv2.createBackgroundSubtractorMOG2(
-        history=500,
-        varThreshold=50,
-        detectShadows=True,
-    )
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    active: Dict[int, _KalmanTrack] = {}
-    finished: List[PersonTrack] = []
-    next_id = 0
+    model = YOLO(model_path)
+
+    tracks_dict: Dict[int, PersonTrack] = {}
+    first_seen: Dict[int, int] = {}
     frame_idx = 0
 
     while True:
@@ -284,61 +285,48 @@ def track_people_in_video(
             break
 
         timestamp = video_start_time + timedelta(seconds=frame_idx / fps)
-        frame_idx += 1
 
-        # Let MOG2 learn the background before we start detecting.
-        if frame_idx <= warmup_frames:
-            bg_sub.apply(frame)
-            continue
-
-        dets = detect_people_in_frame(frame, bg_sub, min_contour_area)
-
-        matched, lost_tids, new_det_idxs = _match_detections_to_tracks(
-            active, dets, max_match_distance,
+        results = model.track(
+            frame,
+            classes=[_COCO_PERSON_CLASS],
+            conf=confidence,
+            persist=True,
+            verbose=False,
         )
 
-        # --- update matched tracks ---
-        for tid, det_idx in matched:
-            d = dets[det_idx]
-            active[tid].correct(d.x, d.y)
-            active[tid].positions.append(
-                TrackedPosition(d.x, d.y, timestamp),
-            )
+        boxes = results[0].boxes
+        if boxes.id is not None:
+            track_ids = boxes.id.cpu().numpy().astype(int)
+            coords = boxes.xyxy.cpu().numpy()
 
-        # --- spawn tracks for brand-new detections ---
-        for det_idx in new_det_idxs:
-            d = dets[det_idx]
-            trk = _KalmanTrack(next_id, d.x, d.y)
-            trk.positions.append(TrackedPosition(d.x, d.y, timestamp))
-            active[next_id] = trk
-            next_id += 1
+            for tid, (x1, y1, x2, y2) in zip(track_ids, coords):
+                tid = int(tid)
+                cx = int((x1 + x2) / 2)
+                cy = int((y1 + y2) / 2)
 
-        # --- age unmatched tracks ---
-        for tid in lost_tids:
-            active[tid].frames_lost += 1
+                if tid not in tracks_dict:
+                    tracks_dict[tid] = PersonTrack(track_id=tid)
+                    first_seen[tid] = frame_idx
 
-        # --- retire tracks that have been lost too long ---
-        expired = [
-            tid for tid, t in active.items()
-            if t.frames_lost > max_frames_lost
-        ]
-        for tid in expired:
-            trk = active.pop(tid)
-            if len(trk.positions) >= min_track_length:
-                finished.append(
-                    PersonTrack(track_id=trk.track_id, positions=trk.positions),
+                tracks_dict[tid].positions.append(
+                    TrackedPosition(cx, cy, timestamp),
                 )
+
+        frame_idx += 1
 
     cap.release()
 
-    # Flush tracks that were still active when the video ended.
-    for trk in active.values():
-        if len(trk.positions) >= min_track_length:
-            finished.append(
-                PersonTrack(track_id=trk.track_id, positions=trk.positions),
-            )
+    raw = [
+        t for t in sorted(tracks_dict.values(),
+                          key=lambda t: first_seen.get(t.track_id, 0))
+        if len(t.positions) >= min_track_length
+    ]
 
-    return finished
+    merged = _merge_fragmented_tracks(
+        raw, frame_width, frame_height, edge_margin=edge_margin,
+    )
+
+    return [t for t in merged if len(t.positions) >= min_track_length]
 
 
 # ---------------------------------------------------------------------------
