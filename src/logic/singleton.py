@@ -2,6 +2,7 @@ from typing import *
 import os
 from pathlib import Path
 from src.pages import logWindow
+from src.utils.paths import get_data_path
 
 
 # TODO later we can have the user adjust the move amount
@@ -22,9 +23,12 @@ class Singleton:
     _databaseVideoFolder: str
 
     def __init__(self):
-        self._tempFolder = os.path.join(os.getcwd(), "assets/videos")
-        self._tempFolderPictures = os.path.join(os.getcwd(), "assets/pictures")
-        self._databaseVideoFolder = os.path.join(os.getcwd(), "assets/databaseVideos")
+        self._tempFolder = get_data_path("videos")
+        self._tempFolderPictures = get_data_path("pictures")
+        self._databaseVideoFolder = get_data_path("databaseVideos")
+        os.makedirs(self._tempFolder, exist_ok=True)
+        os.makedirs(self._tempFolderPictures, exist_ok=True)
+        os.makedirs(self._databaseVideoFolder, exist_ok=True)
         self._selectedVideos = {}
         self._moveAmount = 50
 

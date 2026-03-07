@@ -4,6 +4,7 @@ Customer check-out age, sex, and race estimator.
 
 from __future__ import annotations
 from src.database.model_managers import get_customer_by_id, update_customer
+from src.utils.paths import get_resource_path
 
 import cv2
 
@@ -17,12 +18,12 @@ genderList=['Male','Female']
 MODEL_MEAN_VALUES=(78.4263377603, 87.7689143744, 114.895847746)
 # BGR values
 
-faceProto="src/assets/opencv_face_detector.pbtxt"
-faceModel="src/assets/opencv_face_detector_uint8.pb"
-ageProto="src/assets/age_deploy.prototxt"
-ageModel="src/assets/age_net.caffemodel"
-genderProto="src/assets/gender_deploy.prototxt"
-genderModel="src/assets/gender_net.caffemodel"
+faceProto=get_resource_path("src", "assets", "opencv_face_detector.pbtxt")
+faceModel=get_resource_path("src", "assets", "opencv_face_detector_uint8.pb")
+ageProto=get_resource_path("src", "assets", "age_deploy.prototxt")
+ageModel=get_resource_path("src", "assets", "age_net.caffemodel")
+genderProto=get_resource_path("src", "assets", "gender_deploy.prototxt")
+genderModel=get_resource_path("src", "assets", "gender_net.caffemodel")
 
 faceNet=cv2.dnn.readNet(faceModel,faceProto)
 ageNet=cv2.dnn.readNet(ageModel,ageProto)

@@ -1,8 +1,10 @@
 import os
+import shutil
 from pathlib import Path
 from datetime import datetime
 
 import cv2
+import numpy as np
 
 import dearpygui.dearpygui as dpg
 from src.actions import videoImportDialog
@@ -11,14 +13,16 @@ from src.pages import logWindow
 from src.logic import mediaEditor
 from src.database.model_managers import get_all_stores, add_camera
 from src.database.models import Camera
+from src.utils.paths import get_resource_path
 
 SINGLETON = singleton.Singleton()
-PREVIEW_IMAGE_PATH = os.path.join("assets", "pictures", "refPic.png")
-MERGED_PREVIEW_PATH = os.path.join("assets", "pictures", "merged_preview.png")
+MERGED_PREVIEW_PATH = os.path.join(
+    SINGLETON.get_tempFolderPictures(), "merged_preview.png"
+)
 PREVIEW_TEXTURE_TAG = "camera_merge_preview_texture"
 PREVIEW_TEXTURE_REGISTRY_TAG = "camera_merge_texture_registry"
 PREVIEW_IMAGE_WIDGET_TAG = "camera_merge_preview_image"
-DATABASE_VIDEOS_DIR = os.path.join("assets", "databaseVideos")
+DATABASE_VIDEOS_DIR = SINGLETON.get_databaseVideoFolder()
 STORE_DROPDOWN_TAG = "camera_merge_store_dropdown"
 STORE_PLACEHOLDER = "-- Select Store --"
 STORE_LABEL_TO_ID: dict[str, int] = {}
@@ -174,7 +178,11 @@ def _set_preview_texture(image_path: str) -> None:
     if not os.path.exists(image_path):
         return
 
-    width, height, channels, data = dpg.load_image(image_path)
+    loaded = _load_image_rgba(image_path)
+    if loaded is None:
+        return
+    width, height, data = loaded
+
     if dpg.does_item_exist(PREVIEW_TEXTURE_TAG):
         config = dpg.get_item_configuration(PREVIEW_TEXTURE_TAG)
         current_w = config.get("width", width)
@@ -225,7 +233,7 @@ def refreshMergedImage():
         )
         _set_preview_texture(merged_output_path)
     else:
-        _set_preview_texture(PREVIEW_IMAGE_PATH)
+        _set_preview_texture(_ensure_preview_image_file())
 
 
 def callback_moveCoord(sender, app_data, user_data):
@@ -255,10 +263,13 @@ def create_camera_merge_window():
     initial_preview = (
         MERGED_PREVIEW_PATH
         if os.path.exists(MERGED_PREVIEW_PATH)
-        else PREVIEW_IMAGE_PATH
+        else _ensure_preview_image_file()
     )
-    if os.path.exists(initial_preview):
-        width, height, channels, data = dpg.load_image(initial_preview)
+    loaded = (
+        _load_image_rgba(initial_preview) if os.path.exists(initial_preview) else None
+    )
+    if loaded:
+        width, height, data = loaded
     else:
         width, height, data = 1, 1, [0.2, 0.2, 0.2, 1.0]
 
@@ -355,4 +366,34 @@ def create_camera_merge_window():
             )
         dpg.bind_item_handler_registry("camera_merge_window", handler)
         _resize_preview_to_window()
-        _set_preview_texture(PREVIEW_IMAGE_PATH)
+        _set_preview_texture(_ensure_preview_image_file())
+
+
+def _ensure_preview_image_file() -> str:
+    data_path = os.path.join(SINGLETON.get_tempFolderPictures(), "refPic.png")
+    if os.path.exists(data_path):
+        return data_path
+
+    resource_path = get_resource_path("assets", "pictures", "refPic.png")
+    if os.path.exists(resource_path):
+        try:
+            shutil.copy2(resource_path, data_path)
+            return data_path
+        except Exception:
+            pass
+
+    # Fallback: generate a simple black placeholder
+    os.makedirs(os.path.dirname(data_path), exist_ok=True)
+    placeholder = np.zeros((64, 64, 3), dtype=np.uint8)
+    cv2.imwrite(data_path, placeholder)
+    return data_path
+
+
+def _load_image_rgba(image_path: str):
+    img = cv2.imread(image_path)
+    if img is None:
+        return None
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+    height, width = img.shape[:2]
+    data = (img.astype("float32") / 255.0).reshape(-1)
+    return width, height, data
