@@ -120,7 +120,7 @@ class TestPathConstructor(PathTestCase):
 
     #test for duplicate coordinates
     @patch("src.path_constructor.get_customer_path_points")
-    def tets_duplicate_coordinates(self, mock_get_points):
+    def test_duplicate_coordinates(self, mock_get_points):
         customer_id = 300
         start = datetime.now()
 

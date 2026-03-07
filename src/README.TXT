@@ -2,7 +2,7 @@ TO RUN IN VSCODE:
 
 While in the src folder run:
     python -m src.main
-
+    python -X faulthandler -m src.main
 
 
 To compile windows exe:
