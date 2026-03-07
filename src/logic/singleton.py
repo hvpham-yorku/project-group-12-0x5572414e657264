@@ -18,7 +18,7 @@ class Singleton:
     _instance = None
     _tempFolder: str
     _tempFolderPictures: str
-    _selectedVideos: dict[str, dict[str, bool | List[int, int]]]
+    _selectedVideos: dict  #: dict[str, dict[str, bool | List[int, int]]]
     _moveAmount: int
     _databaseVideoFolder: str
 
