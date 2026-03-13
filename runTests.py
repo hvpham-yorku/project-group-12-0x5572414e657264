@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 testsToRun = [
     "test.path_constructor.test_path_constructor",
@@ -11,8 +12,12 @@ testsToRun = [
     "test.test_logic.test_customerAttributesEstimator",
     "test.pages.test_logWindow",
     "test.pages.test_addStorePopup",
+    "test.pages.test_addStorePopup_ui",
     "test.pages.test_menuBar_cleanup",
     "test.pages.test_cameraZoneWindow_videos",
+    "test.pages.test_cameraMergeWindow_ui",
+    "test.pages.test_cameraZoneWindow_ui",
+    "test.integration.test_gui_workflows",
 ]
 
 
@@ -21,7 +26,7 @@ def main():
         print(f"\n\n\nTESTING THE {test} CLASS OF TESTS!!!!!!")
         subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 test,
             ],
