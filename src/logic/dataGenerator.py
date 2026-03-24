@@ -22,12 +22,26 @@ Store layout (100 x 60 grid, origin at bottom-left):
     customers use to move from one aisle to another.
 """
 
+import csv
 import math
+import os
 import random
 from datetime import datetime, timedelta
 
 from src.database.models import (
     Store, Aisle, Product, Customer, Checkout, Purchase, Path,
+)
+from src.database.database_setup import (
+    db,
+    StoreTable,
+    CustomerTable,
+    AisleTable,
+    ProductTable,
+    CameraTable,
+    PathTable,
+    CheckoutTable,
+    PurchaseTable,
+    LogTable,
 )
 
 
@@ -949,3 +963,223 @@ def _interpolate(
         t += timedelta(seconds=interval_seconds)
 
     return points
+
+
+# ──────────────────────────────────────────────────────────────
+# Database Persistence
+# ──────────────────────────────────────────────────────────────
+
+_SQLITE_VAR_LIMIT = 999
+
+
+def clear_database() -> None:
+    """Delete all rows from every table in referential-integrity-safe order.
+
+    Tables are truncated child-first so no orphaned foreign-key
+    references are created mid-operation.  The entire wipe runs inside
+    a single atomic transaction — either everything is cleared or
+    nothing is.
+    """
+    with db.atomic():
+        LogTable.delete().execute()
+        PurchaseTable.delete().execute()
+        CheckoutTable.delete().execute()
+        PathTable.delete().execute()
+        CameraTable.delete().execute()
+        ProductTable.delete().execute()
+        AisleTable.delete().execute()
+        CustomerTable.delete().execute()
+        StoreTable.delete().execute()
+
+
+def _bulk_insert(table_cls, rows: list[dict]) -> None:
+    """Chunked bulk-insert that respects SQLite's variable limit."""
+    if not rows:
+        return
+    n_fields = len(rows[0])
+    chunk = max(1, _SQLITE_VAR_LIMIT // n_fields)
+    with db.atomic():
+        for i in range(0, len(rows), chunk):
+            table_cls.insert_many(rows[i : i + chunk]).execute()
+
+
+def _write_to_csv(filepath: str, items: list, fieldnames: list[str]) -> None:
+    """Write a list of dataclass instances to a CSV file."""
+    dir_name = os.path.dirname(filepath)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    with open(filepath, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for item in items:
+            writer.writerow({f: getattr(item, f) for f in fieldnames})
+
+
+def generate_and_persist(
+    store_id: int = 1,
+    num_customers: int = 1000,
+    base_date: datetime | None = None,
+    include_sales_data: bool = False,
+    csv_dir: str = "generated_data",
+) -> dict:
+    """Generate a full simulated day and persist the results.
+
+    Orchestrates every generator in this module:
+      1. ``generate_store_and_aisles``
+      2. ``generate_products``
+      3. ``generate_customers``
+      4. ``generate_checkouts_and_purchases``
+      5. ``generate_paths``
+
+    **Store**, **Aisle**, **Customer**, and **Path** rows are always
+    written directly to the database.
+
+    **Product**, **Checkout**, and **Purchase** are only written to the
+    database when ``include_sales_data=True``.  Otherwise they are
+    exported to CSV files under ``csv_dir`` so they can be reviewed,
+    imported, and written through a separate sales-data workflow.
+
+    Call ``clear_database()`` first if the database should start empty.
+
+    Args:
+        store_id:           Store to generate data for.
+        num_customers:      Number of customers to simulate.
+        base_date:          Calendar day to simulate (defaults to today).
+        include_sales_data: If ``True``, Product/Checkout/Purchase are
+                            written to the DB; otherwise to CSV.
+        csv_dir:            Directory for CSV exports when
+                            ``include_sales_data`` is ``False``.
+
+    Returns:
+        A dict with keys ``store``, ``aisles``, ``products``,
+        ``customers``, ``checkouts``, ``purchases``, ``paths``,
+        and ``csv_files`` (table-name -> filepath mapping; empty
+        when ``include_sales_data`` is ``True``).
+    """
+    store, aisles = generate_store_and_aisles(store_id)
+    products = generate_products(store_id, aisles)
+    customers = generate_customers(store_id, num_customers, base_date)
+    checkouts, purchases = generate_checkouts_and_purchases(
+        store_id, customers, products,
+    )
+    paths = generate_paths(customers, checkouts, purchases, products, aisles)
+
+    # --- always persisted to DB ---
+
+    _bulk_insert(StoreTable, [
+        {
+            "store_id": store.store_id,
+            "name": store.name,
+            "owner": store.owner,
+        },
+    ])
+
+    _bulk_insert(AisleTable, [
+        {
+            "aisle_id": a.aisle_id,
+            "store_id": a.store_id,
+            "bottom_left_x": a.bottom_left_x,
+            "bottom_left_y": a.bottom_left_y,
+            "top_right_x": a.top_right_x,
+            "top_right_y": a.top_right_y,
+            "vertical": a.vertical,
+        }
+        for a in aisles
+    ])
+
+    _bulk_insert(CustomerTable, [
+        {
+            "customer_id": c.customer_id,
+            "entered_at": c.entered_at,
+            "exited_at": c.exited_at,
+            "store_id": c.store_id,
+            "age": c.age,
+            "sex": c.sex,
+        }
+        for c in customers
+    ])
+
+    _bulk_insert(PathTable, [
+        {
+            "path_id": p.path_id,
+            "customer_id": p.customer_id,
+            "timestamp": p.timestamp,
+            "location_x": p.location_x,
+            "location_y": p.location_y,
+        }
+        for p in paths
+    ])
+
+    # --- sales data: DB or CSV ---
+
+    csv_files: dict[str, str] = {}
+
+    if include_sales_data:
+        _bulk_insert(ProductTable, [
+            {
+                "product_id": p.product_id,
+                "store_id": p.store_id,
+                "aisle_id": p.aisle_id,
+                "name": p.name,
+                "price": p.price,
+                "order": p.order,
+            }
+            for p in products
+        ])
+
+        _bulk_insert(CheckoutTable, [
+            {
+                "checkout_id": co.checkout_id,
+                "store_id": co.store_id,
+                "customer_id": co.customer_id,
+                "total_price": co.total_price,
+                "created_at": co.created_at,
+            }
+            for co in checkouts
+        ])
+
+        _bulk_insert(PurchaseTable, [
+            {
+                "purchase_id": pu.purchase_id,
+                "product_id": pu.product_id,
+                "checkout_id": pu.checkout_id,
+                "quantity": pu.quantity,
+            }
+            for pu in purchases
+        ])
+    else:
+        product_csv = os.path.join(csv_dir, "products.csv")
+        _write_to_csv(
+            product_csv,
+            products,
+            ["product_id", "store_id", "aisle_id", "name", "price", "order"],
+        )
+        csv_files["product"] = product_csv
+
+        checkout_csv = os.path.join(csv_dir, "checkouts.csv")
+        _write_to_csv(
+            checkout_csv,
+            checkouts,
+            ["checkout_id", "store_id", "customer_id",
+             "total_price", "created_at"],
+        )
+        csv_files["checkout"] = checkout_csv
+
+        purchase_csv = os.path.join(csv_dir, "purchases.csv")
+        _write_to_csv(
+            purchase_csv,
+            purchases,
+            ["purchase_id", "product_id", "checkout_id", "quantity"],
+        )
+        csv_files["purchase"] = purchase_csv
+
+    return {
+        "store": store,
+        "aisles": aisles,
+        "products": products,
+        "customers": customers,
+        "checkouts": checkouts,
+        "purchases": purchases,
+        "paths": paths,
+        "csv_files": csv_files,
+    }
