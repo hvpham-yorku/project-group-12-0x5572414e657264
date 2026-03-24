@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import subprocess
+import random
 
 from src.database.model_managers import add_log
 from src.database.models import Log
@@ -55,8 +56,11 @@ def addLog(severityLevel: int, message: str) -> None:
         )
     )
 
-    if severityLevel == 1:
-        _play_warning_sound()
+    match severityLevel:
+        case 1:
+            _play_warning_sound()
+        case _:
+            _play_customSound(severityLevel)
 
 
 def _play_warning_sound() -> None:
@@ -85,5 +89,32 @@ def _play_warning_sound() -> None:
             if os.path.exists(sound_path):
                 subprocess.Popen(["aplay", sound_path])
                 return
-    except Exception:
+    except Exception as e:
         pass
+
+
+def _play_customSound(severity: int):
+    try:
+        # get sounds
+        path = "src/assets/audio/warningSounds"
+        fullPath = os.path.join(os.getcwd(), path)
+        file_names = []
+        if os.path.exists(fullPath):
+            file_names = [
+                entry.name for entry in os.scandir(fullPath) if entry.is_file()
+            ]
+            # print("Files found:", file_names)
+        else:
+            print("That folder doesn't exist yet!")
+
+        soundPath = os.path.join(
+            fullPath, file_names[random.randint(0, len(file_names) - 1)]
+        )
+        if os.path.exists(soundPath):
+            subprocess.Popen(["afplay", soundPath])
+    except Exception as e:
+        print(e)
+        _play_warning_sound()
+
+
+# _play_customSound(1)
