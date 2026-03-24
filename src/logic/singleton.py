@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from src.pages import logWindow
 from src.utils.paths import get_data_path
+from src.logic.graphWindowData import GraphWindow
 
 
 # TODO later we can have the user adjust the move amount
@@ -21,6 +22,7 @@ class Singleton:
     _selectedVideos: dict  #: dict[str, dict[str, bool | List[int, int]]]
     _moveAmount: int
     _databaseVideoFolder: str
+    _graphWindowObj: GraphWindow
 
     def __init__(self):
         self._tempFolder = get_data_path("videos")
@@ -31,6 +33,10 @@ class Singleton:
         os.makedirs(self._databaseVideoFolder, exist_ok=True)
         self._selectedVideos = {}
         self._moveAmount = 50
+        self._graphWindowObj = GraphWindow()
+
+    def get_graphWindowObj(self) -> GraphWindow:
+        return self._graphWindowObj
 
     def get_tempFolder(self):
         return self._tempFolder

@@ -60,7 +60,7 @@ def addLog(severityLevel: int, message: str) -> None:
         case 1:
             _play_warning_sound()
         case _:
-            _play_customSound(severityLevel)
+            _play_customSound()
 
 
 def _play_warning_sound() -> None:
@@ -113,6 +113,7 @@ def _play_customSound(severity: int = 0):
         if os.path.exists(soundPath):
             subprocess.Popen(["afplay", soundPath])
     except Exception as e:
+        print(f"Sound played was: {soundPath}")
         print(e)
         _play_warning_sound()
 

@@ -1,10 +1,19 @@
 # TODO Refactor into own class maybe?
 
 import dearpygui.dearpygui as dpg
+from src.pages.popupWindow import display_modal_popup
+from src.logic.singleton import Singleton
 
 
-def callback_update_pie_chart(sender, app_data, user_data):
-    pass
+def callback_update_charts(sender, app_data, user_data):
+    chartType = dpg.get_value("chart_type_dropdown")
+    match chartType:
+        case "Pie Chart":
+            display_modal_popup(2, "NOT IMPLEMENTED YET")
+        case "Line Chart":
+            display_modal_popup(2, "NOT IMPLEMENTED YET")
+        case "_":
+            display_modal_popup(2, "Please select a chart type! :)")
 
 
 def callback_save_checked_boxes(sender, app_data, user_data):
@@ -13,18 +22,17 @@ def callback_save_checked_boxes(sender, app_data, user_data):
 
 def create_data_analytics_window(parent: str):
     with dpg.child_window(
-        label="Sales Data From POS",
+        label="Graphs",
         parent=parent,
         # width=FRAME_WIDTH,
         # height=FRAME_HEIGHT,
     ):
-        with dpg.group(horizontal=True):
-            dpg.add_combo(
-                ["Select Chart Type", "Pie Chart", "Line Chart"],
-                label="Chart Type",
-                default_value="Select Chart Type",
-                tag="chart_dropdown",
-            )
+        dpg.add_combo(
+            ["Select Chart Type", "Pie Chart", "Line Chart"],
+            label="Chart Type",
+            default_value="Select Chart Type",
+            tag="chart_type_dropdown",
+        )
         # with dpg.group(horizontal=True):
         with dpg.table(
             tag="dataSelectorOfSelector",
@@ -70,9 +78,11 @@ def create_data_analytics_window(parent: str):
                             default_value=False,
                         )
 
-        dpg.add_button(label="Update Chart", callback=callback_update_pie_chart)
+        dpg.add_button(label="Update Chart", callback=callback_update_charts)
         # 1. Create a plot environment
-        with dpg.plot(label="Fruit Distribution", width=-1, height=-1):
+        with dpg.plot(
+            tag="graphPie", label="Fruit Distribution", width=-1, height=-1, show=False
+        ):
             dpg.add_plot_legend()
 
             # 2. Add an X axis and hide its gridlines and ticks

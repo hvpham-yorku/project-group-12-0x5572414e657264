@@ -5,6 +5,8 @@ from src.pages import mainWindow
 from src.pages import menuBar
 from src.logic import singleton
 
+from src.pages import popupWindow
+
 SINGLETON = singleton.Singleton()
 
 
@@ -23,6 +25,7 @@ def main():
     # Initializes the pages
     mainWindow.mainWindow("main_window")
     menuBar.menuBar()
+    popupWindow.instantiate_popup()
 
     # sets which window is the primary window
     dpg.set_primary_window("main_window", True)
