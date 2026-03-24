@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
@@ -120,6 +120,7 @@ def generate_time_range_heatmaps(paths: List[Path]) -> None:
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
+    heatmap = None #type: ignore
     for ax, (label, start, end) in zip(axes, time_ranges):
         filtered = filter_paths_by_time_range(paths, start, end)
         matrix = log_normalization(paths_to_matrix(filtered))
@@ -138,6 +139,8 @@ def generate_time_range_heatmaps(paths: List[Path]) -> None:
         ax.set_xlim(0, STORE_WIDTH)
         ax.set_ylim(0, STORE_HEIGHT)
 
-    fig.colorbar(heatmap, ax=axes, label="Density")
+    if heatmap is not None:
+        fig.colorbar(heatmap, ax=axes, label="Density")
+
     plt.tight_layout()
     plt.show()
