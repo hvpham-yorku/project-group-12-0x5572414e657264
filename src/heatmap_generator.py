@@ -67,3 +67,25 @@ def save_heatmap(matrix, filename="daily_heatmap.png"):
     plt.title("Daily Store Heatmap")
     plt.savefig(filename)
     plt.close()
+
+#Animate heatmap(live view)
+def animate_heatmap(minute_matrices, interval=200):
+    times = sorted(minute_matrices.keys())
+    matrices = [log_normalization(minute_matrices[t]) for t in times]
+
+    fig, ax = plt.subplots()
+    heatmap = ax.imshow(matrices[0])
+    plt.colorbar(heatmap)
+
+    def update(frame):
+        heatmap.set_data(matrices[frame])
+        ax.set_title(f"Time: {times[frame].strftime('%H:%M')}")
+        return [heatmap]
+
+    anim = FuncAnimation(
+        fig,
+        update,
+        frames=len(matrices),
+        interval=interval, repeat=False)
+
+    plt.show()
