@@ -1,5 +1,7 @@
+import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
 from matplotlib.animation import FuncAnimation, PillowWriter
 from collections import defaultdict
 from datetime import datetime
