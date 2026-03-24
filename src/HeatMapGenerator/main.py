@@ -1,6 +1,12 @@
 from src.logic import dataGenerator
 from heatmap_generator import *
-from src.logic.dataGenerator import generate_store_and_aisles, generate_products, generate_customers
+from src.logic.dataGenerator import (
+    generate_store_and_aisles,
+    generate_products,
+    generate_customers,
+    generate_checkouts_and_purchases,
+    generate_paths)
+
 
 if __name__ == "__main__":
     #generate data
