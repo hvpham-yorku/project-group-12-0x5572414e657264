@@ -1,11 +1,18 @@
 from collections import defaultdict
+from typing import Dict, List
+from datetime import datetime
+from src.database.models import Customer, Checkout
 
-def customer_conversion_function(customers, checkouts):
+
+def customer_conversion_function(
+        customers: List[Customer],
+        checkouts: List[Checkout],
+) -> Dict[str, List[float] | List[int]]:
     #Returns structured data
 
-    customers_per_hour = defaultdict(int)
-    checkouts_per_hour = defaultdict(int)
-    sales_per_hour = defaultdict(float)
+    customers_per_hour: defaultdict[int, int] = defaultdict(int)
+    checkouts_per_hour: defaultdict[int, int] = defaultdict(int)
+    sales_per_hour: defaultdict[int, float]= defaultdict(float)
 
     #Aggregate data by hour
     #count customers
@@ -20,13 +27,13 @@ def customer_conversion_function(customers, checkouts):
         sales_per_hour[hour] += co.total_price
 
     #sort hours
-    hours = sorted(customers_per_hour.keys())
+    hours:List[int] = sorted(customers_per_hour.keys())
 
     #build lists
-    customer_counts = []
-    checkout_counts = []
-    sales_values = []
-    conversion_rates = []
+    customer_counts: List[int] = []
+    checkout_counts: List[int] = []
+    sales_values: List[float] = []
+    conversion_rates: List[float] = []
 
     for h in hours:
         cust = customers_per_hour[h]
