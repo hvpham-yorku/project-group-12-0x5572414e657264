@@ -35,6 +35,39 @@ def filter_paths_by_time_range(paths, start_hour, end_hour):
         if start_hour <= p.timestamp.hour < end_hour
     ]
 
+#definea store layout that's consistent with dataGenerator
+def draw_store_layout():
+    ax = plt.gca()
+
+    #Aisles
+    for i in range(NUM_AISLES):
+        x = AISLE_X_START + i * (AISLE_WIDTH + AISLE_GAP)
+
+        ax.add_patch(
+            plt.Rectangle(
+                (x, AISLE_Y_START),
+                AISLE_WIDTH,
+                AISLE_Y_END - AISLE_Y_START,
+                fill=False,
+                edgecolor="blue",
+                linewidth=2
+            )
+        )
+
+    #checkout counters
+    for x in CHECKOUT_X_POSITIONS:
+        ax.add_patch(
+            plt.Rectangle(
+                (x - 2, CHECKOUT_Y - 2),
+                4,
+                4,
+                color="green",
+            )
+        )
+
+    #Entrance
+    ax.scatter(ENTRANCE_X, ENTRANCE_Y, color="black", label="Entrance")
+
 #Group paths by minute
 def group_paths_by_minute(paths):
     grouped = defaultdict(list)
