@@ -57,3 +57,13 @@ def generate_heatmap(paths):
 
     return daily_matrix, minute_matrices, dict(hour_matrices), grouped
 
+
+#save heatmap
+def save_heatmap(matrix, filename="daily_heatmap.png"):
+    matrix = log_normalization(matrix)
+
+    plt.imshow(matrix)
+    plt.colorbar()
+    plt.title("Daily Store Heatmap")
+    plt.savefig(filename)
+    plt.close()
