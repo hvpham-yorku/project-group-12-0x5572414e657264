@@ -1,6 +1,6 @@
 TO RUN IN VSCODE:
 
-While in the src folder run:
+While in the root folder run:
     python -m src.main
     python -X faulthandler -m src.main
 
