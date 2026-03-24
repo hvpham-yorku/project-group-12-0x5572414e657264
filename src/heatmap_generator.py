@@ -17,3 +17,16 @@ def group_paths_by_minute(paths):
 
     return grouped
 
+#use paths to make a matrix
+def paths_to_matrix(paths, grid_size=(100, 60)):
+    matrix = np.zeros(grid_size)
+
+    for p in paths:
+        x = int(p.location_x)
+        y = int(p.location_y)
+
+        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
+            matrix[x][y] += 1
+
+    return matrix
+
