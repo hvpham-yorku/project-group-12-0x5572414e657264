@@ -90,20 +90,20 @@ def animate_heatmap(minute_matrices, interval=200):
 
     plt.show()
 
-    #save animation as GIF
-    def save_animation(minute_matrices, filename="heatmap.gif"):
-        times = sorted(minute_matrices.keys())
-        matrices = [log_normalization(minute_matrices[t]) for t in times]
+#save animation as GIF
+def save_animation(minute_matrices, filename="heatmap.gif"):
+    times = sorted(minute_matrices.keys())
+    matrices = [log_normalization(minute_matrices[t]) for t in times]
 
-        fig, ax = plt.subplots()
-        heatmap = ax.imshow(matrices[0])
+    fig, ax = plt.subplots()
+    heatmap = ax.imshow(matrices[0])
 
-        def update(frame):
-            heatmap.set_data(matrices[frame])
-            ax.set_title(times[frame].strftime('%H:%M'))
-            return [heatmap]
+    def update(frame):
+        heatmap.set_data(matrices[frame])
+        ax.set_title(times[frame].strftime('%H:%M'))
+        return [heatmap]
 
-        anim = FuncAnimation(fig, update, frames=len(matrices), interval=200)
+    anim = FuncAnimation(fig, update, frames=len(matrices), interval=200)
 
-        anim.save(filename, writer=PillowWriter(fps=5))
-        plt.close()
+    anim.save(filename, writer=PillowWriter(fps=5))
+    plt.close()
