@@ -92,7 +92,7 @@ def animate_heatmap(minute_matrices, interval=200):
 
 #save animation as GIF
 def save_animation(minute_matrices, filename="heatmap.gif"):
-    times = sorted(minute_matrices.keys())
+    times = sorted(minute_matrices.keys())[::5]
     matrices = [log_normalization(minute_matrices[t]) for t in times]
 
     fig, ax = plt.subplots()
