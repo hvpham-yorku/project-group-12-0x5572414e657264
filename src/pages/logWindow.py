@@ -93,7 +93,7 @@ def _play_warning_sound() -> None:
         pass
 
 
-def _play_customSound(severity: int):
+def _play_customSound(severity: int = 0):
     try:
         # get sounds
         path = "src/assets/audio/warningSounds"
