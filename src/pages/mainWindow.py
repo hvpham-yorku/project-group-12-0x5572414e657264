@@ -1,6 +1,6 @@
 import dearpygui.dearpygui as dpg
 from src.themes.themes import *
-from src.pages import salesDataWindow
+from src.pages import salesDataWindow, dataAnalyticsWindow
 from src.pages import logWindow
 
 TOP_RATIO = 0.75  # top row = 35% of viewport height
@@ -28,7 +28,7 @@ def mainWindow(tag: str):
     with dpg.window(tag=tag):
 
         # TOP
-        with dpg.child_window(tag="top_row", width=-1, height=450, border=True):
+        with dpg.child_window(tag="top_row", width=-1, height=550, border=True):
             pass
         # BOTTOM
         with dpg.child_window(tag="bottom_row", width=-1, height=-1, border=True):
@@ -43,8 +43,9 @@ def mainWindow(tag: str):
 
             with dpg.table_row():
                 with dpg.table_cell(tag="cameraFeedCell"):  # LEFT PANEL
-                    with dpg.child_window(border=True):
-                        dpg.add_text("Empty Window")
+                    dataAnalyticsWindow.create_data_analytics_window("temp")
+                    # with dpg.child_window(border=True):
+                    #     dpg.add_text("Empty Window")
 
                 with dpg.table_cell(tag="posDataCell"):  # RIGHT PANEL
                     salesDataWindow.create_sales_data_window("posDataCell")
