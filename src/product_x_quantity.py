@@ -1,8 +1,6 @@
 from typing import List, Dict
 from collections import defaultdict
 
-import pylab as p
-
 from src.database.models import Purchase, Product
 
 def product_x_quantity_function(
