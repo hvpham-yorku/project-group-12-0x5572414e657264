@@ -27,14 +27,21 @@ class DBTestCase(unittest.TestCase):
 class TestStoreManager(DBTestCase):
 
     def test_add_store(self):
-        store = mm.add_store(Store(name="TestMart", owner="Alice"))
+        store = mm.add_store(Store(name="TestMart", owner="Alice", height=600, width=800))
         self.assertIsInstance(store, Store)
         self.assertGreater(store.store_id, 0)
         self.assertEqual(store.name, "TestMart")
         self.assertEqual(store.owner, "Alice")
+        self.assertEqual(store.height, 600)
+        self.assertEqual(store.width, 800)
+
+    def test_add_store_default_dimensions(self):
+        store = mm.add_store(Store(name="Minimal", owner="Bob"))
+        self.assertEqual(store.height, 0)
+        self.assertEqual(store.width, 0)
 
     def test_get_store_by_id(self):
-        created = mm.add_store(Store(name="A", owner="B"))
+        created = mm.add_store(Store(name="A", owner="B", height=100, width=200))
         fetched = mm.get_store_by_id(created.store_id)
         self.assertEqual(fetched, created)
 
@@ -42,16 +49,29 @@ class TestStoreManager(DBTestCase):
         self.assertIsNone(mm.get_store_by_id(9999))
 
     def test_get_all_stores(self):
-        mm.add_store(Store(name="S1", owner="O1"))
-        mm.add_store(Store(name="S2", owner="O2"))
+        mm.add_store(Store(name="S1", owner="O1", height=10, width=20))
+        mm.add_store(Store(name="S2", owner="O2", height=30, width=40))
         stores = mm.get_all_stores()
         self.assertEqual(len(stores), 2)
 
     def test_update_store(self):
-        created = mm.add_store(Store(name="Old", owner="Owner"))
-        updated = mm.update_store(Store(store_id=created.store_id, name="New", owner="Owner"))
+        created = mm.add_store(Store(name="Old", owner="Owner", height=100, width=200))
+        updated = mm.update_store(
+            Store(store_id=created.store_id, name="New", owner="Owner", height=300, width=400)
+        )
         self.assertEqual(updated.name, "New")
         self.assertEqual(updated.store_id, created.store_id)
+        self.assertEqual(updated.height, 300)
+        self.assertEqual(updated.width, 400)
+
+    def test_update_store_dimensions_only(self):
+        created = mm.add_store(Store(name="S", owner="O", height=10, width=20))
+        updated = mm.update_store(
+            Store(store_id=created.store_id, name="S", owner="O", height=50, width=60)
+        )
+        self.assertEqual(updated.name, "S")
+        self.assertEqual(updated.height, 50)
+        self.assertEqual(updated.width, 60)
 
     def test_delete_store(self):
         created = mm.add_store(Store(name="X", owner="Y"))

@@ -325,7 +325,8 @@ def generate_store_and_aisles(store_id: int = 1) -> tuple[Store, list[Aisle]]:
     Returns:
         (Store, list[Aisle]) with sequential IDs starting from 1.
     """
-    store = Store(store_id=store_id, name="SimMart", owner="DataGen Corp")
+    store = Store(store_id=store_id, name="SimMart", owner="DataGen Corp",
+                  height=STORE_HEIGHT, width=STORE_WIDTH)
 
     aisles: list[Aisle] = []
     for i in range(NUM_AISLES):
@@ -1071,6 +1072,8 @@ def generate_and_persist(
             "store_id": store.store_id,
             "name": store.name,
             "owner": store.owner,
+            "height": store.height,
+            "width": store.width,
         },
     ])
 

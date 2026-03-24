@@ -34,6 +34,8 @@ class StoreTable(BaseTable):
     store_id = pw.AutoField()
     name = pw.CharField(max_length=255, default="")
     owner = pw.CharField(max_length=255, default="")
+    height = pw.IntegerField(default=0)
+    width = pw.IntegerField(default=0)
 
     class Meta:
         table_name = "store"

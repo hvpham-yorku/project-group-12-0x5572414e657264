@@ -12,6 +12,8 @@ class Store:
     store_id: int = -1
     name: str = ""
     owner: str = ""
+    height: int = 0
+    width: int = 0
 
 
 @dataclass
