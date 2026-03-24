@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 matplotlib.use('TkAgg')
 from matplotlib.animation import FuncAnimation, PillowWriter
 from collections import defaultdict
+from src.logic.dataGenerator import (
+    STORE_WIDTH, STORE_HEIGHT, NUM_AISLES, AISLE_WIDTH,
+    AISLE_GAP, AISLE_Y_START, AISLE_Y_END, AISLE_X_START,
+    ENTRANCE_X, ENTRANCE_Y, CHECKOUT_Y, CHECKOUT_X_POSITIONS
+)
 from datetime import datetime
 
 #Normalization
@@ -13,13 +18,13 @@ def log_normalization(matrix):
 #use paths to make a matrix
 #possible code smell - layout defined as matrix[x][y] instead of matrix[y][x]
 def paths_to_matrix(paths, grid_size=(100, 60)):
-    matrix = np.zeros((grid_size[1], grid_size[0]))
+    matrix = np.zeros((STORE_HEIGHT, STORE_WIDTH))
 
     for p in paths:
         x = int(p.location_x)
         y = int(p.location_y)
 
-        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
+        if 0 <= x < STORE_WIDTH and 0 <= y < STORE_HEIGHT:
             matrix[y][x] += 1
 
     return matrix
