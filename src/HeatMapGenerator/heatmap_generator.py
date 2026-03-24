@@ -1,6 +1,9 @@
-import matplotlib
+from typing import List
 import numpy as np
+import numpy.typing as npt
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from src.database.models import Path
 
 from src.logic.dataGenerator import (
     STORE_WIDTH, STORE_HEIGHT, NUM_AISLES, AISLE_WIDTH,
@@ -10,13 +13,12 @@ from src.logic.dataGenerator import (
 from datetime import datetime
 
 #Normalization
-def log_normalization(matrix):
+def log_normalization(matrix: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     return np.log1p(matrix)/np.log1p(matrix.max()) if matrix.max() > 0 else matrix
 
 #use paths to make a matrix
-#possible code smell - layout defined as matrix[x][y] instead of matrix[y][x]
-def paths_to_matrix(paths):
-    matrix = np.zeros((STORE_HEIGHT, STORE_WIDTH))
+def paths_to_matrix(paths: List[Path]) -> npt.NDArray[np.float64]:
+    matrix: npt.NDArray[np.float64] = np.zeros((STORE_HEIGHT, STORE_WIDTH))
 
     for p in paths:
         x = int(p.location_x)
@@ -27,14 +29,18 @@ def paths_to_matrix(paths):
 
     return matrix
 
-def filter_paths_by_time_range(paths, start_hour, end_hour):
+def filter_paths_by_time_range(
+        paths: List[Path],
+        start_hour: int,
+        end_hour: int
+) -> List[Path]:
     return [
         p for p in paths
         if start_hour <= p.timestamp.hour < end_hour
     ]
 
 #definea store layout that's consistent with dataGenerator
-def draw_store_layout(ax):
+def draw_store_layout(ax: Axes) -> None:
     #Aisles
     for i in range(NUM_AISLES):
         x = AISLE_X_START + i * (AISLE_WIDTH + AISLE_GAP)
@@ -67,7 +73,10 @@ def draw_store_layout(ax):
     ax.scatter(ENTRANCE_X, ENTRANCE_Y, color="black", s=50, label="Entrance")
 
 #overlay heatmap
-def plot_overlay_heatmap(paths, title="Heatmap"):
+def plot_overlay_heatmap(
+        paths:List[Path],
+        title: str ="Heatmap"
+) -> None:
     matrix = paths_to_matrix(paths)
     matrix = log_normalization(matrix)
 
@@ -94,11 +103,15 @@ def plot_overlay_heatmap(paths, title="Heatmap"):
 
     plt.show()
 
-def generate_custom_heatmap(paths, start_hour, end_hour):
+def generate_custom_heatmap(
+        paths: List[Path],
+        start_hour: int,
+        end_hour: int
+):
     filtered = filter_paths_by_time_range(paths, start_hour, end_hour)
     plot_overlay_heatmap(filtered, f"{start_hour}:00-{end_hour}:00")
 
-def generate_time_range_heatmaps(paths):
+def generate_time_range_heatmaps(paths: List[Path]) -> None:
     time_ranges = [
         ("Morning (7-12)", 7, 12),
         ("Afternoon (12-17)", 12, 17),
