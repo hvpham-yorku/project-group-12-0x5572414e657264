@@ -10,6 +10,26 @@ from datetime import datetime
 def log_normalization(matrix):
     return np.log1p(matrix)/np.log1p(matrix.max()) if matrix.max() > 0 else matrix
 
+#use paths to make a matrix
+#possible code smell - layout defined as matrix[x][y] instead of matrix[y][x]
+def paths_to_matrix(paths, grid_size=(100, 60)):
+    matrix = np.zeros((grid_size[1], grid_size[0]))
+
+    for p in paths:
+        x = int(p.location_x)
+        y = int(p.location_y)
+
+        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
+            matrix[y][x] += 1
+
+    return matrix
+
+def filter_paths_by_time_range(paths, start_hour, end_hour):
+    return [
+        p for p in paths
+        if start_hour <= p.timestamp.hour < end_hour
+    ]
+
 #Group paths by minute
 def group_paths_by_minute(paths):
     grouped = defaultdict(list)
@@ -19,24 +39,6 @@ def group_paths_by_minute(paths):
 
     return grouped
 
-def filter_paths_by_time_range(paths, start_hour, end_hour):
-    return [
-        p for p in paths
-        if start_hour <= p.timestamp.hour < end_hour
-    ]
-
-#use paths to make a matrix
-def paths_to_matrix(paths, grid_size=(100, 60)):
-    matrix = np.zeros(grid_size)
-
-    for p in paths:
-        x = int(p.location_x)
-        y = int(p.location_y)
-
-        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
-            matrix[x][y] += 1
-
-    return matrix
 
 #Main heatmap Generator
 def generate_heatmap(paths):
