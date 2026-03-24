@@ -88,7 +88,7 @@ def animate_heatmap(minute_matrices, interval=200):
         fig,
         update,
         frames=len(matrices),
-        interval=interval, repeat=False)
+        interval=100, blit=True)
 
     plt.show()
 
