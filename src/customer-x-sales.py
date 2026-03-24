@@ -19,6 +19,36 @@ def customer_conversion_function(customers, checkouts):
         checkouts_per_hour[hour] += 1
         sales_per_hour[hour] += co.total_price
 
+    #sort hours
+    hours = sorted(customers_per_hour.keys())
 
+    #build lists
+    customer_counts = []
+    checkout_counts = []
+    sales_values = []
+    conversion_rates = []
+
+    for h in hours:
+        cust = customers_per_hour[h]
+        chk = checkouts_per_hour[h]
+        sales = sales_per_hour[h]
+
+        customer_counts.append(cust)
+        checkout_counts.append(chk)
+        sales_values.append(sales)
+
+        #conversion calculation
+        if cust > 0:
+            conversion_rates.append(chk / cust)
+        else:
+            conversion_rates.append(0)
+
+    return{
+        "hours": hours,
+        "customers": customer_counts,
+        "checkouts": checkout_counts,
+        "sales": sales_values,
+        "conversion_rates": conversion_rates,
+    }
 
 
