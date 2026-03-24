@@ -3,14 +3,15 @@ import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from src.database.models import Path
+from src.database.models import Path, Aisle, Checkout
+from datetime import datetime
 
 from src.logic.dataGenerator import (
     STORE_WIDTH, STORE_HEIGHT, NUM_AISLES, AISLE_WIDTH,
     AISLE_GAP, AISLE_Y_START, AISLE_Y_END, AISLE_X_START,
     ENTRANCE_X, ENTRANCE_Y, CHECKOUT_Y, CHECKOUT_X_POSITIONS
 )
-from datetime import datetime
+
 
 #Normalization
 def log_normalization(matrix: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
