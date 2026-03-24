@@ -30,3 +30,30 @@ def paths_to_matrix(paths, grid_size=(100, 60)):
 
     return matrix
 
+#Main heatmap Generator
+def generate_heatmap(paths):
+    grouped = group_paths_by_minute(paths)
+
+    minute_matrices = {}
+    hour_matrices = defaultdict(lambda: np.zeros((100, 60)))
+
+    open_hour = 7
+    close_hour = 23
+
+    for minute, minute_paths in grouped.items():
+        if not (open_hour <= minute.hour < close_hour):
+            continue
+
+        #minute matrix
+        m_matrix = paths_to_matrix(minute_paths)
+        minute_matrices[minute] = m_matrix
+
+        #aggregate to hour
+        hour_key = minute.replace(minute=0)
+        hour_matrices[hour_key] += m_matrix
+
+    #Daily aggregation
+    daily_matrix = np.sum(list(hour_matrices.values()), axis=0)
+
+    return daily_matrix, minute_matrices, dict(hour_matrices), grouped
+
