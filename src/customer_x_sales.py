@@ -10,7 +10,6 @@ def customer_conversion_function(customers, checkouts):
     #Aggregate data by hour
     #count customers
     for c in customers:
-        # BUG - "hour = exited_at.hour" instead of "hour = c.created_at.hour"
         hour = c.exited_at.hour
         customers_per_hour[hour] += 1
 

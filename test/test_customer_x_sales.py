@@ -14,7 +14,7 @@ class MockCheckout:
 
 class TestCustomerConversion(unittest.TestCase):
 
-    # ✅ Test 1: Basic functionality
+    # Test 1: Basic functionality
     def test_basic_case(self):
         customers = [
             MockCustomer(datetime(2026, 1, 1, 10), datetime(2026, 1, 1, 10)),
@@ -33,7 +33,7 @@ class TestCustomerConversion(unittest.TestCase):
         self.assertEqual(result["sales"], [20.0])
         self.assertAlmostEqual(result["conversion_rates"][0], 0.5)
 
-    # ✅ Test 2: Multiple hours
+    # Test 2: Multiple hours
     def test_multiple_hours(self):
         customers = [
             MockCustomer(datetime(2026, 1, 1, 10), datetime(2026, 1, 1, 10)),
@@ -53,7 +53,7 @@ class TestCustomerConversion(unittest.TestCase):
         self.assertEqual(result["sales"], [10.0, 30.0])
         self.assertEqual(result["conversion_rates"], [1.0, 1.0])
 
-    # ✅ Test 3: No checkouts
+    # Test 3: No checkouts
     def test_no_checkouts(self):
         customers = [
             MockCustomer(datetime(2026, 1, 1, 10), datetime(2026, 1, 1, 10)),
@@ -68,7 +68,7 @@ class TestCustomerConversion(unittest.TestCase):
         self.assertEqual(result["sales"], [0.0])
         self.assertEqual(result["conversion_rates"], [0.0])
 
-    # ✅ Test 4: No customers
+    # Test 4: No customers
     def test_no_customers(self):
         customers = []
         checkouts = [
@@ -83,7 +83,7 @@ class TestCustomerConversion(unittest.TestCase):
         self.assertEqual(result["sales"], [])
         self.assertEqual(result["conversion_rates"], [])
 
-    # ✅ Test 5: Zero division protection
+    # Test 5: Zero division protection
     def test_zero_customers_in_hour(self):
         customers = [
             MockCustomer(datetime(2026, 1, 1, 10), datetime(2026, 1, 1, 10)),
@@ -99,7 +99,7 @@ class TestCustomerConversion(unittest.TestCase):
         self.assertEqual(result["hours"], [10])
         self.assertEqual(result["conversion_rates"], [0.0])
 
-    # ✅ Test 6: Sales aggregation
+    # Test 6: Sales aggregation
     def test_sales_sum(self):
         customers = [
             MockCustomer(datetime(2026, 1, 1, 10), datetime(2026, 1, 1, 10)),
