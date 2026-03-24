@@ -19,6 +19,12 @@ def group_paths_by_minute(paths):
 
     return grouped
 
+def filter_paths_by_time_range(paths, start_hour, end_hour):
+    return [
+        p for p in paths
+        if start_hour <= p.timestamp.hour < end_hour
+    ]
+
 #use paths to make a matrix
 def paths_to_matrix(paths, grid_size=(100, 60)):
     matrix = np.zeros(grid_size)
