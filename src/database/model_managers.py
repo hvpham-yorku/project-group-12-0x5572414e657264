@@ -19,6 +19,8 @@ def _row_to_store(row: StoreTable) -> Store:
         store_id=safe_int(row.store_id),
         name=safe_str(row.name),
         owner=safe_str(row.owner),
+        height=safe_int(row.height, default=0),
+        width=safe_int(row.width, default=0),
     )
 
 
@@ -107,6 +109,8 @@ def add_store(store: Store) -> Store:
     row = StoreTable.create(
         name=safe_str(store.name),
         owner=safe_str(store.owner),
+        height=safe_int(store.height, default=0),
+        width=safe_int(store.width, default=0),
     )
     return _row_to_store(row)
 
@@ -125,6 +129,8 @@ def update_store(store: Store) -> Optional[Store]:
         StoreTable.update(
             name=safe_str(store.name),
             owner=safe_str(store.owner),
+            height=safe_int(store.height, default=0),
+            width=safe_int(store.width, default=0),
         )
         .where(StoreTable.store_id == safe_int(store.store_id))
         .execute()
