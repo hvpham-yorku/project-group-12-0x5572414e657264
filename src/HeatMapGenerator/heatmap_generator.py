@@ -155,8 +155,8 @@ def generate_time_range_heatmaps(
         heatmap = ax.imshow(
             matrix,
             origin='lower',
-            cmap='hot',
-            alpha=0.7,
+            cmap='inferno',
+            alpha=1.0,
             extent=[0, width, 0, height]
         )
 

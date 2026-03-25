@@ -1,3 +1,5 @@
+import random
+
 from heatmap_generator import generate_custom_heatmap, generate_time_range_heatmaps
 
 def main():
@@ -9,11 +11,12 @@ def main():
 
     # Example paths (simulate customer movement)
     paths = [
-        Path(location_x=5, location_y=5, timestamp=datetime(2026, 3, 25, 9, 15)),
-        Path(location_x=6, location_y=5, timestamp=datetime(2026, 3, 25, 9, 16)),
-        Path(location_x=15, location_y=10, timestamp=datetime(2026, 3, 25, 13, 30)),
-        Path(location_x=20, location_y=12, timestamp=datetime(2026, 3, 25, 18, 45)),
-        Path(location_x=5, location_y=5, timestamp=datetime(2026, 3, 25, 9, 20)),
+        Path(
+            location_x=random.randint(0, 30),
+            location_y=random.randint(0, 20),
+            timestamp=datetime(2026, 3, 25, random.randint(7, 22))
+        )
+        for _ in range(500)
     ]
 
     # Example aisles (rectangles)
