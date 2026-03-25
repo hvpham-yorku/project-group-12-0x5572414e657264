@@ -1,4 +1,4 @@
-## KAN-163_PopupWindow:
+## KAN-140_SalesTransactionImport:
 
 ## Estimation: 1 hours
 
