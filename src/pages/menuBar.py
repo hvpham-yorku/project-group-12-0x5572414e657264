@@ -17,7 +17,11 @@ from src.logic.dataGenerator import (
     generate_and_persist,
     import_sales_data_from_csv_dir,
 )
-from src.pages.dataAnalyticsWindow import populateDropDowns
+from src.pages.dataAnalyticsWindow import (
+    GRAPH_PIE_TAB_TAG,
+    GRAPH_VIEW_TAB_BAR_TAG,
+    populateDropDowns,
+)
 
 SINGLETON = singleton.Singleton()
 
@@ -73,6 +77,8 @@ def _refresh_data_analysis_window() -> None:
         dpg.configure_item("graphPie", show=False)
     if dpg.does_item_exist("graphBar"):
         dpg.configure_item("graphBar", show=False)
+    if dpg.does_item_exist(GRAPH_VIEW_TAB_BAR_TAG):
+        dpg.set_value(GRAPH_VIEW_TAB_BAR_TAG, GRAPH_PIE_TAB_TAG)
 
 
 def callback_populateDataBaseWithDemoData(sender, app_data, user_data):

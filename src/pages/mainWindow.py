@@ -43,50 +43,9 @@ def mainWindow(tag: str):
 
             with dpg.table_row():
                 with dpg.table_cell(tag="dataSelection"):  # LEFT PANEL
-                    dataAnalyticsWindow.create_data_analytics_window("temp")
+                    dataAnalyticsWindow.create_data_analytics_window("dataSelection")
                     # with dpg.child_window(border=True):
                     #     dpg.add_text("Empty Window")
                 with dpg.table_cell(tag="graphPlot"):  # RIGHT PANEL
-                    with dpg.plot(
-                        tag="graphPie",
-                        label="Fruit Distribution",
-                        width=-1,
-                        height=-1,
-                        show=False,
-                    ):
-                        dpg.add_plot_legend()
-
-                        # 2. Add an X axis and hide its gridlines and ticks
-                        dpg.add_plot_axis(
-                            dpg.mvXAxis,
-                            no_gridlines=True,
-                            no_tick_marks=True,
-                            no_tick_labels=True,
-                        )
-                        dpg.set_axis_limits(dpg.last_item(), 0, 1)
-
-                        # 3. Add a Y axis (also hidden) - The pie series must be parented to this axis!
-                        with dpg.plot_axis(
-                            dpg.mvYAxis,
-                            no_gridlines=True,
-                            no_tick_marks=True,
-                            no_tick_labels=True,
-                        ) as y_axis:
-                            dpg.set_axis_limits(y_axis, 0, 1)
-
-                            # The data for our slices
-                            slice_values = [15, 30, 45, 10]
-                            slice_labels = ["Apples", "Bananas", "Cherries", "Dates"]
-
-                            # 4. Add the pie series
-                            dpg.add_pie_series(
-                                x=0.5,  # X center coordinate
-                                y=0.5,  # Y center coordinate
-                                radius=0.4,  # Size of the pie
-                                values=slice_values,
-                                labels=slice_labels,
-                                normalize=True,  # Automatically calculates percentages
-                                format="%.1f%%",  # The text format shown when hovering over slices
-                                tag="pieSeries",
-                            )
+                    dataAnalyticsWindow.create_graph_panel("graphPlot")
                     # salesDataWindow.create_sales_data_window("posDataCell")
