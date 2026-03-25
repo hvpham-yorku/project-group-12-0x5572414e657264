@@ -2,6 +2,7 @@ import dearpygui.dearpygui as dpg
 from src.themes import themes
 from src.pages import mainWindow
 from src.pages import menuBar
+from src.pages import dataAnalyticsWindow
 from src.logic import singleton
 
 from src.pages import popupWindow
@@ -37,6 +38,7 @@ def main():
 
     try:
         while dpg.is_dearpygui_running():
+            dataAnalyticsWindow.pump_simulation_view()
             dpg.render_dearpygui_frame()
             dpg.run_callbacks(dpg.get_callback_queue())
     finally:

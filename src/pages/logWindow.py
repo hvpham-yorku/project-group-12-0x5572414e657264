@@ -101,11 +101,17 @@ def _play_customSound(severity: int = 0):
         file_names = []
         if os.path.exists(fullPath):
             file_names = [
-                entry.name for entry in os.scandir(fullPath) if entry.is_file()
+                entry.name
+                for entry in os.scandir(fullPath)
+                if entry.is_file() and entry.name.lower().endswith((".mp3", ".wav", ".aiff", ".ogg"))
             ]
             # print("Files found:", file_names)
         else:
             print("That folder doesn't exist yet!")
+
+        if not file_names:
+            _play_warning_sound()
+            return
 
         soundPath = os.path.join(
             fullPath, file_names[random.randint(0, len(file_names) - 1)]

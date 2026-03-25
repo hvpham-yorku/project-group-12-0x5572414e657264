@@ -26,11 +26,23 @@ class TestMainWindowUI(GuiDbTestCase):
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_VIEW_TAB_BAR_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_PIE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_ANALYTICS_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_SIMULATION_TAB_TAG))
         self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_AISLE_GENDER_TABLE_TAG)
         )
         self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.SECTION_TIME_TABLE_TAG)
+        )
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.SIMULATION_SUMMARY_TABLE_TAG)
+        )
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.SIMULATION_RENDER_BUTTON_TAG))
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.SIMULATION_RENDER_PROGRESS_TAG)
+        )
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.SIMULATION_VIDEO_IMAGE_TAG))
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.SIMULATION_VIDEO_FRAME_INPUT_TAG)
         )
 
     def test_graph_panel_populates_analytics_tables_from_database(self):
@@ -118,6 +130,18 @@ class TestMainWindowUI(GuiDbTestCase):
         )
         self.assertIn(["Age Range", "(25-32)"], estimator_rows)
         self.assertIn(["Gender Label", "Female"], estimator_rows)
+
+    def test_graph_panel_populates_simulation_tables(self):
+        mainWindow.mainWindow("main_window")
+        dataAnalyticsWindow.refresh_simulation_info_tables()
+
+        simulation_rows = _get_row_values(dataAnalyticsWindow.SIMULATION_SUMMARY_TABLE_TAG)
+        aisle_rows = _get_row_values(dataAnalyticsWindow.SIMULATION_AISLES_TABLE_TAG)
+
+        self.assertIn(["Output File", "store_simulation.mp4"], simulation_rows)
+        self.assertTrue(any(row[0] == "Video Exists" for row in simulation_rows))
+        self.assertTrue(any(row[0] == "FPS" for row in simulation_rows))
+        self.assertTrue(any(row[1] == "Bakery & Bread" for row in aisle_rows))
 
 
 if __name__ == "__main__":

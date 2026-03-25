@@ -11,8 +11,9 @@ Run from the project root:
 import bisect
 import sys
 import os
+from dataclasses import dataclass
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import cv2
 import numpy as np
@@ -59,6 +60,76 @@ COL_TEXT = (50, 50, 50)
 COL_BG = (250, 250, 248)
 
 OUTPUT_FILE = "store_simulation.mp4"
+
+
+@dataclass(frozen=True)
+class SimulationOverview:
+    output_file: str
+    output_path: str
+    output_exists: bool
+    output_size_bytes: int
+    output_modified_at: str
+    store_width: int
+    store_height: int
+    image_width: int
+    image_height: int
+    num_aisles: int
+    sim_step_seconds: int
+    fps: int
+    dot_radius: int
+    aisle_categories: list[str]
+
+
+@dataclass(frozen=True)
+class SimulationRenderResult:
+    output_path: str
+    peak_count: int
+    num_frames: int
+    video_seconds: float
+
+
+def get_simulation_overview() -> SimulationOverview:
+    """Return simulation settings and current output-file metadata."""
+    candidate_paths = [
+        os.path.abspath(OUTPUT_FILE),
+        os.path.abspath(OUTPUT_FILE.replace(".mp4", ".avi")),
+    ]
+    existing_paths = [path for path in candidate_paths if os.path.exists(path)]
+    output_path = (
+        max(existing_paths, key=os.path.getmtime)
+        if existing_paths
+        else candidate_paths[0]
+    )
+    output_exists = os.path.exists(output_path)
+    output_size_bytes = os.path.getsize(output_path) if output_exists else 0
+    output_modified_at = ""
+    if output_exists:
+        output_modified_at = datetime.fromtimestamp(
+            os.path.getmtime(output_path)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+    return SimulationOverview(
+        output_file=os.path.basename(output_path),
+        output_path=output_path,
+        output_exists=output_exists,
+        output_size_bytes=output_size_bytes,
+        output_modified_at=output_modified_at,
+        store_width=STORE_WIDTH,
+        store_height=STORE_HEIGHT,
+        image_width=IMG_W,
+        image_height=IMG_H,
+        num_aisles=len(AISLE_CATEGORIES),
+        sim_step_seconds=SIM_STEP,
+        fps=FPS,
+        dot_radius=DOT_RADIUS,
+        aisle_categories=[category["name"] for category in AISLE_CATEGORIES],
+    )
+
+
+def _emit_progress(progress_callback, progress: float, status: str) -> None:
+    if progress_callback is None:
+        return
+    progress_callback(max(0.0, min(progress, 1.0)), status)
 
 
 def grid_to_px(gx: float, gy: float) -> tuple[int, int]:
@@ -130,30 +201,30 @@ def draw_background(aisles) -> np.ndarray:
     return img
 
 
-def main():
-    print("=== SimMart Day Simulation ===\n")
+def render_simulation(progress_callback=None) -> SimulationRenderResult:
+    _emit_progress(progress_callback, 0.0, "Starting simulation render...")
 
-    print("[1/5] Generating store & products...")
     store, aisles = generate_store_and_aisles()
     products = generate_products(store.store_id, aisles)
+    _emit_progress(progress_callback, 0.10, "Generated store layout and products.")
 
-    print("[2/5] Generating customers...")
     customers = generate_customers(store.store_id)
+    _emit_progress(progress_callback, 0.20, "Generated customers.")
 
-    print("[3/5] Generating checkouts & purchases...")
     checkouts, purchases = generate_checkouts_and_purchases(
         store.store_id, customers, products,
     )
+    _emit_progress(progress_callback, 0.30, "Generated checkouts and purchases.")
 
-    print("[4/5] Generating paths (this takes a moment)...")
     paths = generate_paths(customers, checkouts, purchases, products, aisles)
-
-    print(
-        f"       {len(customers):,} customers  |  {len(checkouts):,} checkouts  |  "
-        f"{len(purchases):,} purchases  |  {len(paths):,} path points\n"
+    _emit_progress(
+        progress_callback,
+        0.45,
+        (
+            f"Generated paths for {len(customers):,} customers, "
+            f"{len(checkouts):,} checkouts, {len(purchases):,} purchases."
+        ),
     )
-
-    # ── Pre-index path points for fast per-frame lookup ───────
 
     raw: dict[int, list] = defaultdict(list)
     for p in paths:
@@ -176,21 +247,28 @@ def main():
     total_sim_secs = (max_time - min_time).total_seconds()
     num_frames = int(total_sim_secs / SIM_STEP) + 1
     video_secs = num_frames / FPS
-
-    # ── Render ────────────────────────────────────────────────
-
-    print(f"[5/5] Rendering {num_frames:,} frames @ {FPS} fps  "
-          f"({video_secs:.0f}s video) ...")
+    _emit_progress(
+        progress_callback,
+        0.50,
+        f"Rendering {num_frames:,} frames at {FPS} fps.",
+    )
 
     bg = draw_background(aisles)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(OUTPUT_FILE, fourcc, FPS, (IMG_W, IMG_H))
+    output_file = OUTPUT_FILE
+    temp_output_file = OUTPUT_FILE.replace(".mp4", ".rendering.mp4")
+    writer = cv2.VideoWriter(temp_output_file, fourcc, FPS, (IMG_W, IMG_H))
 
     if not writer.isOpened():
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-        alt = OUTPUT_FILE.replace(".mp4", ".avi")
-        writer = cv2.VideoWriter(alt, fourcc, FPS, (IMG_W, IMG_H))
-        print(f"       (mp4v unavailable — falling back to {alt})")
+        output_file = OUTPUT_FILE.replace(".mp4", ".avi")
+        temp_output_file = output_file.replace(".avi", ".rendering.avi")
+        writer = cv2.VideoWriter(temp_output_file, fourcc, FPS, (IMG_W, IMG_H))
+        _emit_progress(
+            progress_callback,
+            0.52,
+            f"mp4v unavailable; falling back to {output_file}.",
+        )
 
     peak_count = 0
 
@@ -232,14 +310,54 @@ def main():
         )
 
         writer.write(frame)
-
-        if fi % 200 == 0 or fi == num_frames - 1:
-            pct = (fi + 1) / num_frames * 100
-            print(f"       {pct:5.1f}%  {time_str}  ({count} customers)")
+        render_progress = 0.50 + (0.50 * ((fi + 1) / num_frames))
+        if fi % 50 == 0 or fi == num_frames - 1:
+            _emit_progress(
+                progress_callback,
+                render_progress,
+                f"Rendering frame {fi + 1:,}/{num_frames:,} at {time_str}.",
+            )
 
     writer.release()
-    print(f"\nDone!  Peak customers at once: {peak_count}")
-    print(f"Video saved to: {os.path.abspath(OUTPUT_FILE)}")
+    output_path = os.path.abspath(output_file)
+    temp_output_path = os.path.abspath(temp_output_file)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    os.replace(temp_output_path, output_path)
+    alt_output_path = os.path.abspath(
+        OUTPUT_FILE.replace(".mp4", ".avi")
+        if output_file.endswith(".mp4")
+        else OUTPUT_FILE
+    )
+    if alt_output_path != output_path and os.path.exists(alt_output_path):
+        os.remove(alt_output_path)
+    _emit_progress(
+        progress_callback,
+        1.0,
+        f"Render complete. Peak customers: {peak_count}. Saved to {output_path}",
+    )
+
+    return SimulationRenderResult(
+        output_path=output_path,
+        peak_count=peak_count,
+        num_frames=num_frames,
+        video_seconds=video_secs,
+    )
+
+
+def main():
+    print("=== SimMart Day Simulation ===\n")
+
+    last_status = {"value": ""}
+
+    def _print_progress(progress: float, status: str) -> None:
+        if status != last_status["value"]:
+            print(status)
+            last_status["value"] = status
+
+    result = render_simulation(progress_callback=_print_progress)
+    print(f"\nDone!  Peak customers at once: {result.peak_count}")
+    print(f"Video saved to: {result.output_path}")
 
 
 if __name__ == "__main__":

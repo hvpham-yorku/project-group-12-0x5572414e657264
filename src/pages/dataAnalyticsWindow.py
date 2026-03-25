@@ -1,15 +1,22 @@
 # TODO Refactor into own class maybe?
 
 import ast
+import os
+import threading
+import time
 from pathlib import Path
 
+import cv2
 import dearpygui.dearpygui as dpg
+import numpy as np
 from src.database.model_managers import get_all_stores
 from src.logic import (
     customerAisleAnalytics,
     customerProductAnalytics,
     sectionTimeAnalysis,
+    visualize_simulation,
 )
+from src.pages import logWindow
 from src.pages.popupWindow import display_modal_popup
 from src.logic.singleton import Singleton
 
@@ -18,6 +25,7 @@ END_TIME_PLACEHOLDER = "Select End Time"
 GRAPH_VIEW_TAB_BAR_TAG = "graph_view_tabs"
 GRAPH_PIE_TAB_TAG = "graph_pie_tab"
 GRAPH_ANALYTICS_TAB_TAG = "graph_analytics_tab"
+GRAPH_SIMULATION_TAB_TAG = "graph_simulation_tab"
 
 CUSTOMER_AISLE_GENDER_TABLE_TAG = "customer_aisle_gender_table"
 CUSTOMER_AISLE_AGE_TABLE_TAG = "customer_aisle_age_table"
@@ -25,6 +33,44 @@ CUSTOMER_PRODUCT_GENDER_TABLE_TAG = "customer_product_gender_table"
 CUSTOMER_PRODUCT_AGE_TABLE_TAG = "customer_product_age_table"
 CUSTOMER_ATTRIBUTES_TABLE_TAG = "customer_attributes_estimator_table"
 SECTION_TIME_TABLE_TAG = "section_time_analysis_table"
+SIMULATION_SUMMARY_TABLE_TAG = "simulation_summary_table"
+SIMULATION_AISLES_TABLE_TAG = "simulation_aisles_table"
+SIMULATION_RENDER_BUTTON_TAG = "simulation_render_button"
+SIMULATION_RENDER_PROGRESS_TAG = "simulation_render_progress"
+SIMULATION_RENDER_STATUS_TAG = "simulation_render_status"
+SIMULATION_VIDEO_STATUS_TAG = "simulation_video_status"
+SIMULATION_VIDEO_TEXTURE_TAG = "simulation_video_texture"
+SIMULATION_VIDEO_TEXTURE_REGISTRY_TAG = "simulation_video_texture_registry"
+SIMULATION_VIDEO_IMAGE_TAG = "simulation_video_image"
+SIMULATION_VIDEO_PLAY_BUTTON_TAG = "simulation_video_play_button"
+SIMULATION_VIDEO_PAUSE_BUTTON_TAG = "simulation_video_pause_button"
+SIMULATION_VIDEO_RESTART_BUTTON_TAG = "simulation_video_restart_button"
+SIMULATION_VIDEO_REFRESH_BUTTON_TAG = "simulation_video_refresh_button"
+SIMULATION_VIDEO_FRAME_INPUT_TAG = "simulation_video_frame_input"
+SIMULATION_VIDEO_JUMP_BUTTON_TAG = "simulation_video_jump_button"
+SIMULATION_VIDEO_TEX_WIDTH = 640
+SIMULATION_VIDEO_TEX_HEIGHT = 360
+SIMULATION_VIDEO_TEX_DATA = [0.0, 0.0, 0.0, 1.0] * (
+    SIMULATION_VIDEO_TEX_WIDTH * SIMULATION_VIDEO_TEX_HEIGHT
+)
+
+_SIMULATION_RENDER_STATE = {
+    "thread": None,
+    "is_rendering": False,
+    "progress": 0.0,
+    "status": "Ready to render.",
+    "completed": False,
+    "logged_done": False,
+    "result": None,
+}
+_SIMULATION_RENDER_LOCK = threading.Lock()
+_SIMULATION_VIDEO_CAPTURE = None
+_SIMULATION_VIDEO_PATH: str | None = None
+_SIMULATION_VIDEO_PLAYING = False
+_SIMULATION_VIDEO_LAST_FRAME_TIME = 0.0
+_SIMULATION_VIDEO_FPS = 20.0
+_SIMULATION_VIDEO_FRAME_COUNT = 0
+_SIMULATION_VIDEO_CURRENT_FRAME = 0
 
 
 def _clear_selector_rows(table_tag: str) -> None:
@@ -330,6 +376,356 @@ def _load_section_time_analysis_rows() -> list[list[str]]:
         return [[f"Failed to load data: {exc}", "", "", "", "", "", ""]]
 
 
+def _format_bytes(num_bytes: int) -> str:
+    if num_bytes <= 0:
+        return "0 B"
+
+    units = ["B", "KB", "MB", "GB"]
+    size = float(num_bytes)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.2f} {unit}"
+        size /= 1024
+
+    return f"{num_bytes} B"
+
+
+def _get_simulation_summary_rows() -> list[list[str]]:
+    overview = visualize_simulation.get_simulation_overview()
+    return [
+        ["Output File", overview.output_file],
+        ["Output Path", overview.output_path],
+        ["Video Exists", "Yes" if overview.output_exists else "No"],
+        ["Video Size", _format_bytes(overview.output_size_bytes)],
+        ["Last Modified", overview.output_modified_at or "Not generated yet"],
+        ["Store Size", f"{overview.store_width} x {overview.store_height}"],
+        ["Frame Size", f"{overview.image_width} x {overview.image_height}"],
+        ["Aisle Count", str(overview.num_aisles)],
+        ["Simulation Step", f"{overview.sim_step_seconds} seconds"],
+        ["FPS", str(overview.fps)],
+        ["Dot Radius", str(overview.dot_radius)],
+    ]
+
+
+def _load_simulation_summary_rows() -> list[list[str]]:
+    try:
+        return _get_simulation_summary_rows()
+    except Exception as exc:
+        return [[f"Failed to load simulation info: {exc}", ""]]
+
+
+def _get_simulation_aisle_rows() -> list[list[str]]:
+    overview = visualize_simulation.get_simulation_overview()
+    return [
+        [str(index + 1), name]
+        for index, name in enumerate(overview.aisle_categories)
+    ]
+
+
+def _load_simulation_aisle_rows() -> list[list[str]]:
+    try:
+        return _get_simulation_aisle_rows()
+    except Exception as exc:
+        return [[f"Failed to load aisle categories: {exc}", ""]]
+
+
+def _ensure_simulation_video_texture() -> None:
+    if not dpg.does_item_exist(SIMULATION_VIDEO_TEXTURE_REGISTRY_TAG):
+        with dpg.texture_registry(tag=SIMULATION_VIDEO_TEXTURE_REGISTRY_TAG):
+            pass
+
+    if dpg.does_item_exist(SIMULATION_VIDEO_TEXTURE_TAG):
+        return
+
+    dpg.add_dynamic_texture(
+        width=SIMULATION_VIDEO_TEX_WIDTH,
+        height=SIMULATION_VIDEO_TEX_HEIGHT,
+        default_value=SIMULATION_VIDEO_TEX_DATA,
+        tag=SIMULATION_VIDEO_TEXTURE_TAG,
+        parent=SIMULATION_VIDEO_TEXTURE_REGISTRY_TAG,
+    )
+
+
+def _queue_simulation_video_update(data: list[float]) -> None:
+    if not dpg.does_item_exist(SIMULATION_VIDEO_TEXTURE_TAG):
+        return
+    if len(data) != len(SIMULATION_VIDEO_TEX_DATA):
+        return
+    SIMULATION_VIDEO_TEX_DATA[:] = data
+    dpg.set_value(SIMULATION_VIDEO_TEXTURE_TAG, SIMULATION_VIDEO_TEX_DATA)
+
+
+def _frame_to_texture_data(frame: np.ndarray) -> list[float]:
+    frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    frame_rgba = cv2.resize(
+        frame_rgba,
+        (SIMULATION_VIDEO_TEX_WIDTH, SIMULATION_VIDEO_TEX_HEIGHT),
+        interpolation=cv2.INTER_AREA,
+    )
+    return (frame_rgba.astype("float32") / 255.0).reshape(-1).tolist()
+
+
+def _set_simulation_video_frame(frame: np.ndarray) -> None:
+    _ensure_simulation_video_texture()
+    _queue_simulation_video_update(_frame_to_texture_data(frame))
+
+
+def _set_simulation_video_blank_frame() -> None:
+    blank_frame = np.zeros(
+        (SIMULATION_VIDEO_TEX_HEIGHT, SIMULATION_VIDEO_TEX_WIDTH, 3),
+        dtype=np.uint8,
+    )
+    _set_simulation_video_frame(blank_frame)
+
+
+def _set_simulation_video_status(message: str) -> None:
+    if dpg.does_item_exist(SIMULATION_VIDEO_STATUS_TAG):
+        dpg.set_value(SIMULATION_VIDEO_STATUS_TAG, message)
+
+
+def _sync_simulation_frame_input() -> None:
+    if dpg.does_item_exist(SIMULATION_VIDEO_FRAME_INPUT_TAG):
+        dpg.set_value(
+            SIMULATION_VIDEO_FRAME_INPUT_TAG,
+            max(1, _SIMULATION_VIDEO_CURRENT_FRAME or 1),
+        )
+
+
+def _release_simulation_video_capture() -> None:
+    global _SIMULATION_VIDEO_CAPTURE, _SIMULATION_VIDEO_PATH
+    if _SIMULATION_VIDEO_CAPTURE is not None:
+        _SIMULATION_VIDEO_CAPTURE.release()
+    _SIMULATION_VIDEO_CAPTURE = None
+    _SIMULATION_VIDEO_PATH = None
+
+
+def _load_simulation_video_capture(video_path: str) -> bool:
+    global _SIMULATION_VIDEO_CAPTURE, _SIMULATION_VIDEO_PATH
+    global _SIMULATION_VIDEO_FPS, _SIMULATION_VIDEO_FRAME_COUNT
+
+    if (
+        _SIMULATION_VIDEO_CAPTURE is not None
+        and _SIMULATION_VIDEO_PATH == video_path
+        and _SIMULATION_VIDEO_CAPTURE.isOpened()
+    ):
+        return True
+
+    _release_simulation_video_capture()
+    capture = cv2.VideoCapture(video_path)
+    if not capture.isOpened():
+        return False
+
+    _SIMULATION_VIDEO_CAPTURE = capture
+    _SIMULATION_VIDEO_PATH = video_path
+    _SIMULATION_VIDEO_FPS = capture.get(cv2.CAP_PROP_FPS) or 20.0
+    _SIMULATION_VIDEO_FRAME_COUNT = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    return True
+
+
+def _display_simulation_video_first_frame() -> bool:
+    global _SIMULATION_VIDEO_CURRENT_FRAME, _SIMULATION_VIDEO_LAST_FRAME_TIME
+    overview = visualize_simulation.get_simulation_overview()
+    if not overview.output_exists or not os.path.exists(overview.output_path):
+        _release_simulation_video_capture()
+        _set_simulation_video_blank_frame()
+        _set_simulation_video_status("No rendered simulation video found yet.")
+        return False
+
+    if not _load_simulation_video_capture(overview.output_path):
+        _release_simulation_video_capture()
+        _set_simulation_video_blank_frame()
+        _set_simulation_video_status("Failed to open the rendered simulation video.")
+        return False
+
+    assert _SIMULATION_VIDEO_CAPTURE is not None
+    _SIMULATION_VIDEO_CAPTURE.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    success, frame = _SIMULATION_VIDEO_CAPTURE.read()
+    if not success:
+        _release_simulation_video_capture()
+        _set_simulation_video_blank_frame()
+        _set_simulation_video_status("Failed to read the first video frame.")
+        return False
+
+    _set_simulation_video_frame(frame)
+    _SIMULATION_VIDEO_CURRENT_FRAME = 1
+    _SIMULATION_VIDEO_LAST_FRAME_TIME = time.monotonic()
+    _sync_simulation_frame_input()
+    frame_count_suffix = (
+        f"/{_SIMULATION_VIDEO_FRAME_COUNT}" if _SIMULATION_VIDEO_FRAME_COUNT else ""
+    )
+    _set_simulation_video_status(
+        f"Loaded video frame 1{frame_count_suffix}. Use Play to start playback."
+    )
+    return True
+
+
+def _set_simulation_playback_button_state() -> None:
+    overview = visualize_simulation.get_simulation_overview()
+    has_video = overview.output_exists and os.path.exists(overview.output_path)
+    if dpg.does_item_exist(SIMULATION_VIDEO_PLAY_BUTTON_TAG):
+        dpg.configure_item(
+            SIMULATION_VIDEO_PLAY_BUTTON_TAG,
+            enabled=has_video and not _SIMULATION_RENDER_STATE["is_rendering"],
+        )
+    if dpg.does_item_exist(SIMULATION_VIDEO_PAUSE_BUTTON_TAG):
+        dpg.configure_item(
+            SIMULATION_VIDEO_PAUSE_BUTTON_TAG,
+            enabled=_SIMULATION_VIDEO_PLAYING,
+        )
+    if dpg.does_item_exist(SIMULATION_VIDEO_RESTART_BUTTON_TAG):
+        dpg.configure_item(
+            SIMULATION_VIDEO_RESTART_BUTTON_TAG,
+            enabled=has_video and not _SIMULATION_RENDER_STATE["is_rendering"],
+        )
+    if dpg.does_item_exist(SIMULATION_VIDEO_JUMP_BUTTON_TAG):
+        dpg.configure_item(
+            SIMULATION_VIDEO_JUMP_BUTTON_TAG,
+            enabled=has_video and not _SIMULATION_RENDER_STATE["is_rendering"],
+        )
+    if dpg.does_item_exist(SIMULATION_VIDEO_FRAME_INPUT_TAG):
+        dpg.configure_item(
+            SIMULATION_VIDEO_FRAME_INPUT_TAG,
+            enabled=has_video and not _SIMULATION_RENDER_STATE["is_rendering"],
+        )
+
+
+def _simulation_video_tick(sender=None, app_data=None) -> None:
+    global _SIMULATION_VIDEO_PLAYING
+    global _SIMULATION_VIDEO_LAST_FRAME_TIME, _SIMULATION_VIDEO_CURRENT_FRAME
+
+    if not _SIMULATION_VIDEO_PLAYING:
+        _set_simulation_playback_button_state()
+        return
+
+    if _SIMULATION_VIDEO_CAPTURE is None or not _SIMULATION_VIDEO_CAPTURE.isOpened():
+        _SIMULATION_VIDEO_PLAYING = False
+        _set_simulation_video_status("Video playback stopped; no video is loaded.")
+        _set_simulation_playback_button_state()
+        return
+
+    now = time.monotonic()
+    frame_interval = 1.0 / max(_SIMULATION_VIDEO_FPS, 1.0)
+    if now - _SIMULATION_VIDEO_LAST_FRAME_TIME < frame_interval:
+        return
+
+    success, frame = _SIMULATION_VIDEO_CAPTURE.read()
+    if not success:
+        _SIMULATION_VIDEO_PLAYING = False
+        _set_simulation_video_status("Playback finished.")
+        _set_simulation_playback_button_state()
+        return
+
+    _set_simulation_video_frame(frame)
+    _SIMULATION_VIDEO_LAST_FRAME_TIME = now
+    _SIMULATION_VIDEO_CURRENT_FRAME = int(
+        _SIMULATION_VIDEO_CAPTURE.get(cv2.CAP_PROP_POS_FRAMES) or 0
+    )
+    _sync_simulation_frame_input()
+    frame_count_suffix = (
+        f"/{_SIMULATION_VIDEO_FRAME_COUNT}" if _SIMULATION_VIDEO_FRAME_COUNT else ""
+    )
+    _set_simulation_video_status(
+        f"Playing frame {_SIMULATION_VIDEO_CURRENT_FRAME}{frame_count_suffix}."
+    )
+    _set_simulation_playback_button_state()
+
+
+def _jump_to_simulation_frame(frame_number: int) -> bool:
+    global _SIMULATION_VIDEO_CURRENT_FRAME, _SIMULATION_VIDEO_LAST_FRAME_TIME
+    overview = visualize_simulation.get_simulation_overview()
+    if not overview.output_exists or not os.path.exists(overview.output_path):
+        _set_simulation_video_status("No rendered simulation video found yet.")
+        return False
+
+    if not _load_simulation_video_capture(overview.output_path):
+        _set_simulation_video_status("Failed to open the rendered simulation video.")
+        return False
+
+    assert _SIMULATION_VIDEO_CAPTURE is not None
+    max_frame = _SIMULATION_VIDEO_FRAME_COUNT if _SIMULATION_VIDEO_FRAME_COUNT > 0 else 1
+    target_frame = max(1, min(frame_number, max_frame))
+    _SIMULATION_VIDEO_CAPTURE.set(cv2.CAP_PROP_POS_FRAMES, target_frame - 1)
+    success, frame = _SIMULATION_VIDEO_CAPTURE.read()
+    if not success:
+        _set_simulation_video_status(f"Failed to jump to frame {target_frame}.")
+        return False
+
+    _set_simulation_video_frame(frame)
+    _SIMULATION_VIDEO_CURRENT_FRAME = target_frame
+    _SIMULATION_VIDEO_LAST_FRAME_TIME = time.monotonic()
+    _sync_simulation_frame_input()
+    frame_count_suffix = (
+        f"/{_SIMULATION_VIDEO_FRAME_COUNT}" if _SIMULATION_VIDEO_FRAME_COUNT else ""
+    )
+    _set_simulation_video_status(
+        f"Showing frame {target_frame}{frame_count_suffix}."
+    )
+    return True
+
+
+def _update_simulation_render_state(progress: float, status: str) -> None:
+    with _SIMULATION_RENDER_LOCK:
+        _SIMULATION_RENDER_STATE["progress"] = progress
+        _SIMULATION_RENDER_STATE["status"] = status
+
+
+def _run_simulation_render() -> None:
+    try:
+        result = visualize_simulation.render_simulation(
+            progress_callback=_update_simulation_render_state
+        )
+        with _SIMULATION_RENDER_LOCK:
+            _SIMULATION_RENDER_STATE["result"] = result
+            _SIMULATION_RENDER_STATE["progress"] = 1.0
+            _SIMULATION_RENDER_STATE["status"] = (
+                f"Render complete. Peak customers: {result.peak_count}."
+            )
+            _SIMULATION_RENDER_STATE["completed"] = True
+            _SIMULATION_RENDER_STATE["is_rendering"] = False
+    except Exception as exc:
+        with _SIMULATION_RENDER_LOCK:
+            _SIMULATION_RENDER_STATE["result"] = None
+            _SIMULATION_RENDER_STATE["progress"] = 0.0
+            _SIMULATION_RENDER_STATE["status"] = f"Render failed: {exc}"
+            _SIMULATION_RENDER_STATE["completed"] = True
+            _SIMULATION_RENDER_STATE["is_rendering"] = False
+
+
+def _poll_simulation_render_state(sender=None, app_data=None) -> None:
+    with _SIMULATION_RENDER_LOCK:
+        progress = _SIMULATION_RENDER_STATE["progress"]
+        status = _SIMULATION_RENDER_STATE["status"]
+        is_rendering = _SIMULATION_RENDER_STATE["is_rendering"]
+        completed = _SIMULATION_RENDER_STATE["completed"]
+        logged_done = _SIMULATION_RENDER_STATE["logged_done"]
+        result = _SIMULATION_RENDER_STATE["result"]
+
+    if dpg.does_item_exist(SIMULATION_RENDER_PROGRESS_TAG):
+        dpg.set_value(SIMULATION_RENDER_PROGRESS_TAG, progress)
+        dpg.configure_item(
+            SIMULATION_RENDER_PROGRESS_TAG,
+            overlay=f"{progress * 100:.0f}%",
+        )
+    if dpg.does_item_exist(SIMULATION_RENDER_STATUS_TAG):
+        dpg.set_value(SIMULATION_RENDER_STATUS_TAG, status)
+    if dpg.does_item_exist(SIMULATION_RENDER_BUTTON_TAG):
+        dpg.configure_item(SIMULATION_RENDER_BUTTON_TAG, enabled=not is_rendering)
+
+    _set_simulation_playback_button_state()
+
+    if completed and not logged_done:
+        refresh_simulation_info_tables()
+        _display_simulation_video_first_frame()
+        if result is not None:
+            logWindow.addLog(0, f"Simulation rendered to {result.output_path}")
+        else:
+            logWindow.addLog(2, status)
+        with _SIMULATION_RENDER_LOCK:
+            _SIMULATION_RENDER_STATE["logged_done"] = True
+
+
 def refresh_analytics_data_tables() -> None:
     if not dpg.does_item_exist(CUSTOMER_AISLE_GENDER_TABLE_TAG):
         return
@@ -372,14 +768,135 @@ def refresh_analytics_data_tables() -> None:
     )
 
 
+def refresh_simulation_info_tables() -> None:
+    if not dpg.does_item_exist(SIMULATION_SUMMARY_TABLE_TAG):
+        return
+
+    _populate_table_rows(
+        SIMULATION_SUMMARY_TABLE_TAG,
+        _load_simulation_summary_rows(),
+        "No simulation summary available.",
+        2,
+    )
+    _populate_table_rows(
+        SIMULATION_AISLES_TABLE_TAG,
+        _load_simulation_aisle_rows(),
+        "No aisle categories available.",
+        2,
+    )
+    _set_simulation_playback_button_state()
+
+
 def callback_refresh_analytics_data(sender, app_data, user_data):
     refresh_analytics_data_tables()
+
+
+def callback_refresh_simulation_info(sender, app_data, user_data):
+    refresh_simulation_info_tables()
+    if not _SIMULATION_RENDER_STATE["is_rendering"]:
+        _display_simulation_video_first_frame()
+    _set_simulation_playback_button_state()
+
+
+def callback_render_simulation(sender, app_data, user_data):
+    global _SIMULATION_VIDEO_PLAYING
+    with _SIMULATION_RENDER_LOCK:
+        if _SIMULATION_RENDER_STATE["is_rendering"]:
+            return
+        _SIMULATION_RENDER_STATE["thread"] = None
+        _SIMULATION_RENDER_STATE["is_rendering"] = True
+        _SIMULATION_RENDER_STATE["progress"] = 0.0
+        _SIMULATION_RENDER_STATE["status"] = "Starting simulation render..."
+        _SIMULATION_RENDER_STATE["completed"] = False
+        _SIMULATION_RENDER_STATE["logged_done"] = False
+        _SIMULATION_RENDER_STATE["result"] = None
+
+    _SIMULATION_VIDEO_PLAYING = False
+    _release_simulation_video_capture()
+    _set_simulation_video_blank_frame()
+    _set_simulation_video_status("Rendering simulation video...")
+    if dpg.does_item_exist(SIMULATION_RENDER_PROGRESS_TAG):
+        dpg.set_value(SIMULATION_RENDER_PROGRESS_TAG, 0.0)
+        dpg.configure_item(SIMULATION_RENDER_PROGRESS_TAG, overlay="0%")
+    if dpg.does_item_exist(SIMULATION_RENDER_STATUS_TAG):
+        dpg.set_value(SIMULATION_RENDER_STATUS_TAG, "Starting simulation render...")
+    thread = threading.Thread(target=_run_simulation_render, daemon=True)
+    with _SIMULATION_RENDER_LOCK:
+        _SIMULATION_RENDER_STATE["thread"] = thread
+
+    thread.start()
+    _set_simulation_playback_button_state()
+
+
+def callback_play_simulation_video(sender, app_data, user_data):
+    global _SIMULATION_VIDEO_PLAYING, _SIMULATION_VIDEO_LAST_FRAME_TIME
+    if _SIMULATION_RENDER_STATE["is_rendering"]:
+        display_modal_popup(2, "Wait for the simulation render to finish first.")
+        return
+
+    if _SIMULATION_VIDEO_CAPTURE is None or not _SIMULATION_VIDEO_CAPTURE.isOpened():
+        if not _display_simulation_video_first_frame():
+            display_modal_popup(2, "No rendered simulation video is available yet.")
+            return
+    elif (
+        _SIMULATION_VIDEO_FRAME_COUNT
+        and _SIMULATION_VIDEO_CURRENT_FRAME >= _SIMULATION_VIDEO_FRAME_COUNT
+    ):
+        if not _display_simulation_video_first_frame():
+            display_modal_popup(2, "No rendered simulation video is available yet.")
+            return
+
+    _SIMULATION_VIDEO_PLAYING = True
+    _SIMULATION_VIDEO_LAST_FRAME_TIME = 0.0
+    _set_simulation_video_status("Playing simulation video...")
+    _set_simulation_playback_button_state()
+
+
+def callback_pause_simulation_video(sender, app_data, user_data):
+    global _SIMULATION_VIDEO_PLAYING
+    _SIMULATION_VIDEO_PLAYING = False
+    _set_simulation_video_status("Playback paused.")
+    _set_simulation_playback_button_state()
+
+
+def callback_restart_simulation_video(sender, app_data, user_data):
+    global _SIMULATION_VIDEO_PLAYING
+    _SIMULATION_VIDEO_PLAYING = False
+    if not _display_simulation_video_first_frame():
+        display_modal_popup(2, "No rendered simulation video is available yet.")
+    _set_simulation_playback_button_state()
+
+
+def callback_jump_simulation_video_frame(sender, app_data, user_data):
+    global _SIMULATION_VIDEO_PLAYING
+    _SIMULATION_VIDEO_PLAYING = False
+    target_frame = dpg.get_value(SIMULATION_VIDEO_FRAME_INPUT_TAG)
+    if not _jump_to_simulation_frame(int(target_frame)):
+        display_modal_popup(2, "Unable to jump to that frame.")
+    _set_simulation_playback_button_state()
+
+
+def pump_simulation_view() -> None:
+    with _SIMULATION_RENDER_LOCK:
+        is_rendering = _SIMULATION_RENDER_STATE["is_rendering"]
+        completed = _SIMULATION_RENDER_STATE["completed"]
+        logged_done = _SIMULATION_RENDER_STATE["logged_done"]
+
+    if is_rendering or (completed and not logged_done):
+        _poll_simulation_render_state()
+
+    if _SIMULATION_VIDEO_PLAYING:
+        _simulation_video_tick()
 
 
 def callback_graph_view_changed(sender, app_data, user_data):
     selected_tab = dpg.get_value(GRAPH_VIEW_TAB_BAR_TAG)
     if selected_tab == GRAPH_ANALYTICS_TAB_TAG:
         refresh_analytics_data_tables()
+    elif selected_tab == GRAPH_SIMULATION_TAB_TAG:
+        refresh_simulation_info_tables()
+        if not _SIMULATION_RENDER_STATE["is_rendering"]:
+            _display_simulation_video_first_frame()
 
 
 def create_analytics_data_view(parent: str) -> None:
@@ -459,6 +976,109 @@ def create_analytics_data_view(parent: str) -> None:
                 section_header,
             )
 
+
+def create_simulation_view(parent: str) -> None:
+    _ensure_simulation_video_texture()
+    with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
+        with dpg.group(horizontal=True):
+            dpg.add_button(
+                label="Render Simulation",
+                tag=SIMULATION_RENDER_BUTTON_TAG,
+                callback=callback_render_simulation,
+            )
+            dpg.add_button(
+                label="Refresh Simulation Info",
+                tag=SIMULATION_VIDEO_REFRESH_BUTTON_TAG,
+                callback=callback_refresh_simulation_info,
+            )
+        dpg.add_progress_bar(
+            default_value=0.0,
+            overlay="0%",
+            width=-1,
+            tag=SIMULATION_RENDER_PROGRESS_TAG,
+        )
+        dpg.add_text(
+            "Render progress will appear here.",
+            tag=SIMULATION_RENDER_STATUS_TAG,
+        )
+
+        with dpg.collapsing_header(
+            label="Simulation Output",
+            default_open=True,
+        ) as simulation_header:
+            dpg.add_text(
+                "Run `python -m src.logic.visualize_simulation` from the project root to generate or refresh the simulation video."
+            )
+            _add_stretch_table(
+                SIMULATION_SUMMARY_TABLE_TAG,
+                ["Property", "Value"],
+                simulation_header,
+            )
+
+        with dpg.collapsing_header(
+            label="Simulation Aisles",
+            default_open=True,
+        ) as aisles_header:
+            dpg.add_text("Aisle categories rendered in the simulation")
+            _add_stretch_table(
+                SIMULATION_AISLES_TABLE_TAG,
+                ["Aisle", "Category"],
+                aisles_header,
+            )
+
+        with dpg.collapsing_header(
+            label="Video Playback",
+            default_open=True,
+        ) as playback_header:
+            with dpg.group(horizontal=True, parent=playback_header):
+                dpg.add_button(
+                    label="Play",
+                    tag=SIMULATION_VIDEO_PLAY_BUTTON_TAG,
+                    callback=callback_play_simulation_video,
+                )
+                dpg.add_button(
+                    label="Pause",
+                    tag=SIMULATION_VIDEO_PAUSE_BUTTON_TAG,
+                    callback=callback_pause_simulation_video,
+                )
+                dpg.add_button(
+                    label="Restart",
+                    tag=SIMULATION_VIDEO_RESTART_BUTTON_TAG,
+                    callback=callback_restart_simulation_video,
+                )
+            with dpg.group(horizontal=True, parent=playback_header):
+                dpg.add_text("Jump To Frame:")
+                dpg.add_input_int(
+                    tag=SIMULATION_VIDEO_FRAME_INPUT_TAG,
+                    default_value=1,
+                    min_value=1,
+                    min_clamped=True,
+                    width=120,
+                )
+                dpg.add_button(
+                    label="Jump",
+                    tag=SIMULATION_VIDEO_JUMP_BUTTON_TAG,
+                    callback=callback_jump_simulation_video_frame,
+                )
+            dpg.add_text(
+                "No rendered simulation video found yet.",
+                parent=playback_header,
+                tag=SIMULATION_VIDEO_STATUS_TAG,
+            )
+            dpg.add_image(
+                SIMULATION_VIDEO_TEXTURE_TAG,
+                parent=playback_header,
+                tag=SIMULATION_VIDEO_IMAGE_TAG,
+                width=SIMULATION_VIDEO_TEX_WIDTH,
+                height=SIMULATION_VIDEO_TEX_HEIGHT,
+            )
+
+    _set_simulation_video_blank_frame()
+    refresh_simulation_info_tables()
+    _display_simulation_video_first_frame()
+    _set_simulation_playback_button_state()
+
+
 def _create_pie_chart_view(parent: str) -> None:
     dpg.add_text("Use Update Chart to render the selected data.", parent=parent)
     with dpg.plot(
@@ -509,6 +1129,8 @@ def create_graph_panel(parent: str) -> None:
                 _create_pie_chart_view(GRAPH_PIE_TAB_TAG)
             with dpg.tab(label="Analytics Data", tag=GRAPH_ANALYTICS_TAB_TAG):
                 create_analytics_data_view(GRAPH_ANALYTICS_TAB_TAG)
+            with dpg.tab(label="Simulation", tag=GRAPH_SIMULATION_TAB_TAG):
+                create_simulation_view(GRAPH_SIMULATION_TAB_TAG)
 
 
 def create_data_analytics_window(parent: str):
