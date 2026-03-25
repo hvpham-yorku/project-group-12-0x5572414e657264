@@ -3,9 +3,8 @@ import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from datetime import datetime
 
-from src.database.models import Path, Aisle
+from src.database.models import Path, Aisle, Store
 
 
 # ---------------------------
@@ -16,19 +15,21 @@ def log_normalization(matrix: npt.NDArray[np.float64]) -> npt.NDArray[np.float64
 
 
 # ---------------------------
-# DYNAMIC STORE DIMENSIONS
+# STORE DIMENSIONS (FROM DB)
 # ---------------------------
-def get_store_dimensions(paths: List[Path]) -> Tuple[int, int]:
-    max_x = max((p.location_x for p in paths), default=0)
-    max_y = max((p.location_y for p in paths), default=0)
-    return max_x + 1, max_y + 1
+def get_store_dimensions(store: Store) -> Tuple[int, int]:
+    return store.width, store.height
 
 
 # ---------------------------
 # PATHS → MATRIX
 # ---------------------------
-def paths_to_matrix(paths: List[Path]) -> npt.NDArray[np.float64]:
-    width, height = get_store_dimensions(paths)
+def paths_to_matrix(
+        paths: List[Path],
+        store: Store
+) -> npt.NDArray[np.float64]:
+
+    width, height = get_store_dimensions(store)
     matrix = np.zeros((height, width))
 
     for p in paths:
@@ -85,10 +86,11 @@ def draw_store_layout(
 def plot_overlay_heatmap(
         paths: List[Path],
         aisles: List[Aisle],
+        store: Store,
         title: str = "Heatmap"
 ) -> None:
 
-    matrix = log_normalization(paths_to_matrix(paths))
+    matrix = log_normalization(paths_to_matrix(paths, store))
     height, width = matrix.shape
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -121,11 +123,12 @@ def plot_overlay_heatmap(
 def generate_custom_heatmap(
         paths: List[Path],
         aisles: List[Aisle],
+        store: Store,
         start_hour: int,
         end_hour: int
 ):
     filtered = filter_paths_by_time_range(paths, start_hour, end_hour)
-    plot_overlay_heatmap(filtered, aisles, f"{start_hour}:00-{end_hour}:00")
+    plot_overlay_heatmap(filtered, aisles, store, f"{start_hour}:00-{end_hour}:00")
 
 
 # ---------------------------
@@ -133,7 +136,8 @@ def generate_custom_heatmap(
 # ---------------------------
 def generate_time_range_heatmaps(
         paths: List[Path],
-        aisles: List[Aisle]
+        aisles: List[Aisle],
+        store: Store
 ) -> None:
 
     time_ranges = [
@@ -148,7 +152,7 @@ def generate_time_range_heatmaps(
 
     for ax, (label, start, end) in zip(axes, time_ranges):
         filtered = filter_paths_by_time_range(paths, start, end)
-        matrix = log_normalization(paths_to_matrix(filtered))
+        matrix = log_normalization(paths_to_matrix(filtered, store))
 
         height, width = matrix.shape
 
