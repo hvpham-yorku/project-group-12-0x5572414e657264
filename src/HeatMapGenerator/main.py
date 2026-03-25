@@ -1,27 +1,41 @@
-from src.logic import dataGenerator
-from heatmap_generator import *
-from src.logic.dataGenerator import (
-    generate_store_and_aisles,
-    generate_products,
-    generate_customers,
-    generate_checkouts_and_purchases,
-    generate_paths)
+from heatmap_generator import generate_custom_heatmap, generate_time_range_heatmaps
+
+def main():
+    # -----------------------------------
+    # MOCK DATA (replace with DB later)
+    # -----------------------------------
+    from datetime import datetime
+    from src.database.models import Path, Aisle
+
+    # Example paths (simulate customer movement)
+    paths = [
+        Path(location_x=5, location_y=5, timestamp=datetime(2026, 3, 25, 9, 15)),
+        Path(location_x=6, location_y=5, timestamp=datetime(2026, 3, 25, 9, 16)),
+        Path(location_x=15, location_y=10, timestamp=datetime(2026, 3, 25, 13, 30)),
+        Path(location_x=20, location_y=12, timestamp=datetime(2026, 3, 25, 18, 45)),
+        Path(location_x=5, location_y=5, timestamp=datetime(2026, 3, 25, 9, 20)),
+    ]
+
+    # Example aisles (rectangles)
+    aisles = [
+        Aisle(bottom_left_x=3, bottom_left_y=0, top_right_x=8, top_right_y=20),
+        Aisle(bottom_left_x=12, bottom_left_y=0, top_right_x=17, top_right_y=20),
+        Aisle(bottom_left_x=21, bottom_left_y=0, top_right_x=26, top_right_y=20),
+    ]
+
+    # -----------------------------------
+    # RUN HEATMAPS
+    # -----------------------------------
+
+    # Single custom time range
+    generate_custom_heatmap(paths, aisles, 7, 12)
+
+    # OR: multiple time ranges
+    generate_time_range_heatmaps(paths, aisles)
 
 
+# -----------------------------------
+# ENTRY POINT
+# -----------------------------------
 if __name__ == "__main__":
-    #generate data
-    store, aisles = generate_store_and_aisles()
-    products = generate_products(store.store_id, aisles)
-    customers = generate_customers(store.store_id, num_customers=50)
-
-    checkouts, purchases = generate_checkouts_and_purchases(
-        store.store_id, customers, products
-    )
-
-    paths = generate_paths(customers, checkouts, purchases, products, aisles)
-
-    #Generate heatmap
-    generate_custom_heatmap(paths, 7,8)
-
-    #compare time ranges
-    generate_time_range_heatmaps(paths)
+    main()
