@@ -1,19 +1,9 @@
 import dearpygui.dearpygui as dpg
 
-from src.database.database_setup import (
-    db,
-    StoreTable,
-    CustomerTable,
-    AisleTable,
-    ProductTable,
-    CameraTable,
-    PathTable,
-    CheckoutTable,
-    PurchaseTable,
-    LogTable,
-)
-from src.pages import logWindow
+from src.pages import cameraMergeWindow, cameraZoneWindow, logWindow
 from src.logic.dataGenerator import clear_database
+from src.pages.dataAnalyticsWindow import populateDropDowns
+from src.logic.singleton import Singleton
 
 WINDOW_TAG = "wipe_database_popup"
 
@@ -23,10 +13,18 @@ def _close_popup() -> None:
         dpg.delete_item(WINDOW_TAG)
 
 
+def _refresh_database_backed_views() -> None:
+    Singleton().reset_graphWindowObj()
+    populateDropDowns()
+    cameraZoneWindow.refresh_store_dropdowns()
+    cameraMergeWindow.refresh_store_dropdown()
+
+
 def _wipe_database(sender, app_data, user_data) -> None:
     try:
         clear_database()
         logWindow.addLog(0, "Database wiped.")
+        _refresh_database_backed_views()
     except Exception as exc:
         logWindow.addLog(2, f"Database wipe failed: {exc}")
     finally:

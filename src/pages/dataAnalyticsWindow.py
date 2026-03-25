@@ -4,13 +4,43 @@ import dearpygui.dearpygui as dpg
 from src.pages.popupWindow import display_modal_popup
 from src.logic.singleton import Singleton
 
+START_TIME_PLACEHOLDER = "Select Start Time"
+END_TIME_PLACEHOLDER = "Select End Time"
+
+
+def _clear_selector_rows(table_tag: str) -> None:
+    if not dpg.does_item_exist(table_tag):
+        return
+    for row in dpg.get_item_children(table_tag, 1) or []:
+        dpg.delete_item(row)
+
+
+def _reset_time_selectors(start_items: list[str]) -> None:
+    if dpg.does_item_exist("StartTimes"):
+        dpg.configure_item("StartTimes", items=start_items)
+        dpg.set_value("StartTimes", START_TIME_PLACEHOLDER)
+
+    if dpg.does_item_exist("EndTimes"):
+        dpg.configure_item("EndTimes", items=[END_TIME_PLACEHOLDER])
+        dpg.set_value("EndTimes", END_TIME_PLACEHOLDER)
+
 
 def callback_update_charts(sender, app_data, user_data):
     s = Singleton().get_graphWindowObj()
     chartType = dpg.get_value("chart_type_dropdown")
     isValidState, errorMessage = s.is_validState()
     if not isValidState:
-        chartType = "INVALID"
+        display_modal_popup(2, errorMessage)
+        return
+
+    newLabel = " + ".join(s.get_checkBoxCategoriesTrue()) or "Selected Data"
+    data = s.getValuesToGraph()
+    if not data[0]:
+        if dpg.does_item_exist("graphPie"):
+            dpg.configure_item("graphPie", show=False)
+        display_modal_popup(2, "No data to display.... :(")
+        return
+
     match chartType:
         case "Pie Chart":
             dpg.configure_item("pieSeries", values=data[0], labels=data[1])
@@ -21,16 +51,9 @@ def callback_update_charts(sender, app_data, user_data):
             dpg.configure_item("graphBar", label=newLabel)
             dpg.configure_item("graphBar", show=True)
             # display_modal_popup(2, "NOT IMPLEMENTED YET")
-        case "INVALID":
-            display_modal_popup(2, errorMessage)
-            return
         case _:
             display_modal_popup(2, "Please select a chart type! :)")
             return
-    newLabel = " + ".join(s.get_checkBoxCategoriesTrue())
-    data = s.getValuesToGraph()
-    if not data[0]:
-        display_modal_popup(2, "No data to display.... :(")
 
 
 def callback_saveCheckBoxCounts(sender, app_data, user_data):
@@ -46,17 +69,6 @@ def callback_saveCheckBoxCategories(sender, app_data, user_data):
 
 
 def callback_swapCategoriesAndCounts(sender, app_data, user_data):
-    table_rowsCounts = dpg.get_item_children(
-        "countsSelector", 1
-    )  # 1 specifies child slot for table rows
-    for row in table_rowsCounts:
-        dpg.delete_item(row)
-
-    table_rowsCategories = dpg.get_item_children(
-        "categorySelector", 1
-    )  # 1 specifies child slot for table rows
-    for row in table_rowsCategories:
-        dpg.delete_item(row)
     Singleton().get_graphWindowObj().swap_category_and_counted()
     populateDropDowns()
 
@@ -69,7 +81,11 @@ def callback_test():
 
 def populateDropDowns() -> None:
     s = Singleton().get_graphWindowObj()
+    s.refresh_available_options()
     s.clearBoxesValues()
+    s.resetSelectedTimeFrame()
+    _clear_selector_rows("countsSelector")
+    _clear_selector_rows("categorySelector")
     parent = []
     if s.get_dataTypeIsCountAndCategory() == "product":
         parent.append("countsSelector")
@@ -103,45 +119,58 @@ def populateDropDowns() -> None:
         #     items=s.get_categoriesAvailable(),
         #     callback=callback_save_checked_boxes,
         # )
-    possibleDateTimes = Singleton().get_graphWindowObj()._get_possibleDateTimes()
-    possibleDateTimes = [str(x) for x in possibleDateTimes]
-    possibleDateTimes = ["Select Start Time"] + possibleDateTimes
-    dpg.configure_item("StartTimes", items=possibleDateTimes)
-    dpg.configure_item("EndTimes", default_value="Select End Time")
-    s.resetSelectedTimeFrame()
+    possibleDateTimes = [str(x) for x in s._get_possibleDateTimes()]
+    _reset_time_selectors([START_TIME_PLACEHOLDER] + possibleDateTimes)
 
 
 def callback_startTimeSelected(sender, app_data, user_data):
-    dpg.get_value("problem_difficulty_dropdown")
     selected = dpg.get_value("StartTimes")
-    if selected == "Select Start Time":
-        dpg.configure_item("EndTimes", items=["Select End Time"])
-    else:
-        print(selected)
-        possibleDateTimes = Singleton().get_graphWindowObj()._get_possibleDateTimes()
-        strDateTimeDic = {}
-        for date in possibleDateTimes:
-            strDateTimeDic[str(date)] = date
-        possibleDateTimes = possibleDateTimes[
-            possibleDateTimes.index(strDateTimeDic[selected]) :
-        ]
-        possibleDateTimes = ["Select End Time"] + [str(x) for x in possibleDateTimes]
-        dpg.configure_item(
-            "EndTimes",
-            items=possibleDateTimes,
+    s = Singleton().get_graphWindowObj()
+
+    if selected == START_TIME_PLACEHOLDER:
+        if dpg.does_item_exist("EndTimes"):
+            dpg.configure_item("EndTimes", items=[END_TIME_PLACEHOLDER])
+            dpg.set_value("EndTimes", END_TIME_PLACEHOLDER)
+        s.resetSelectedTimeFrame()
+        return
+
+    possibleDateTimes = s._get_possibleDateTimes()
+    strDateTimeDic = {str(date): date for date in possibleDateTimes}
+    selected_datetime = strDateTimeDic.get(selected)
+    if selected_datetime is None:
+        _reset_time_selectors(
+            [START_TIME_PLACEHOLDER] + [str(x) for x in possibleDateTimes]
         )
+        return
+
+    selected_index = possibleDateTimes.index(selected_datetime)
+    end_items = [END_TIME_PLACEHOLDER] + [
+        str(x) for x in possibleDateTimes[selected_index:]
+    ]
+    if dpg.does_item_exist("EndTimes"):
+        dpg.configure_item("EndTimes", items=end_items)
+        dpg.set_value("EndTimes", END_TIME_PLACEHOLDER)
+    s.resetSelectedTimeFrame()
 
 
 def callback_EndTimeSelected(sender, app_data, user_data):
+    s = Singleton().get_graphWindowObj()
     start = dpg.get_value("StartTimes")
     end = dpg.get_value("EndTimes")
-    possibleDateTimes = Singleton().get_graphWindowObj()._get_possibleDateTimes()
-    strDateTimeDic = {}
-    for date in possibleDateTimes:
-        strDateTimeDic[str(date)] = date
-    Singleton().get_graphWindowObj().setSelectedTimeFrame(
-        strDateTimeDic[start], strDateTimeDic[end]
-    )
+
+    if start == START_TIME_PLACEHOLDER or end == END_TIME_PLACEHOLDER:
+        s.resetSelectedTimeFrame()
+        return
+
+    possibleDateTimes = s._get_possibleDateTimes()
+    strDateTimeDic = {str(date): date for date in possibleDateTimes}
+    start_time = strDateTimeDic.get(start)
+    end_time = strDateTimeDic.get(end)
+    if start_time is None or end_time is None:
+        s.resetSelectedTimeFrame()
+        return
+
+    s.setSelectedTimeFrame(start_time, end_time)
 
 
 def create_data_analytics_window(parent: str):
@@ -162,16 +191,16 @@ def create_data_analytics_window(parent: str):
         )
         with dpg.group(horizontal=True):
             dpg.add_combo(
-                ["Select Start Time"],
+                [START_TIME_PLACEHOLDER],
                 tag="StartTimes",
-                default_value="Select Start Time",
+                default_value=START_TIME_PLACEHOLDER,
                 callback=callback_startTimeSelected,
                 fit_width=True,
             )
             dpg.add_combo(
-                ["Select End Time"],
+                [END_TIME_PLACEHOLDER],
                 tag="EndTimes",
-                default_value="Select End Time",
+                default_value=END_TIME_PLACEHOLDER,
                 callback=callback_EndTimeSelected,
                 fit_width=True,
             )

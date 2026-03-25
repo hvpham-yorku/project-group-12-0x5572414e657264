@@ -24,40 +24,51 @@ class GraphWindow:
         self._countValues = [15, 30, 45, 10]
         self._categoriesValues = ["Apples", "Bananas", "Cherries", "Dates"]
         self._chartType = "NONE"
-        self._categoriesAvailable = get_allDemographicCategories()
-        self._countsAvailable = get_allProductsAndProductCategories()
-        self._possibleDateTimes = get_allPossibleDateTimes()
+        self._categoriesAvailable = []
+        self._countsAvailable = []
+        self._possibleDateTimes = []
         self._countTypeSelected = "product"
         self._countsSelected = []
         self._checkBoxCounts = {}
         self._checkBoxCategories = {}
         self._selectedTimeFrame = []
+        self.refresh_available_options()
+
+    def refresh_available_options(self) -> None:
+        self._categoriesAvailable = get_allDemographicCategories()
+        self._countsAvailable = get_allProductsAndProductCategories()
+        self._possibleDateTimes = get_allPossibleDateTimes()
 
     def getValuesToGraph(self) -> None:
+        if len(self._selectedTimeFrame) < 2:
+            return [[], []]
+
         # need to filter by time frame
         ages = []
         genders = []
         products = []
         productCategories = []
-        for category in self._checkBoxCategories.keys():
-            if self._checkBoxCategories[category]:
-                if category[0] == "M" or category[0] == "F":
-                    genders.append(category[0])
+        for category, is_selected in self._checkBoxCategories.items():
+            if is_selected:
+                cleaned_category = category.rstrip()
+                if not cleaned_category:
+                    continue
+                if cleaned_category[0] == "M" or cleaned_category[0] == "F":
+                    genders.append(cleaned_category[0])
                 else:
-                    ages.append(category)
-        for product in self._checkBoxCounts.keys():
-            if self._checkBoxCounts[product]:
+                    ages.append(cleaned_category)
+        for product, is_selected in self._checkBoxCounts.items():
+            if is_selected:
                 # check if it is a product or an aisle
-                if "#" in product:
+                cleaned_product = product.rstrip()
+                if not cleaned_product:
+                    continue
+                if "#" in cleaned_product:
                     # then this is a product
-                    tempProductName = product.rstrip()
-                    products.append(tempProductName[: tempProductName.index("#")])
-                else:
-                    tempProductCategoryName = product.rstrip()
+                    products.append(cleaned_product[: cleaned_product.index("#")])
+                elif ":" in cleaned_product:
                     productCategories.append(
-                        tempProductCategoryName[
-                            tempProductCategoryName.index(":") + 2 :
-                        ]
+                        cleaned_product[cleaned_product.index(":") + 2 :]
                     )
         return get_AllProductAndTimeDataToGraph(
             self._selectedTimeFrame[0],
@@ -115,7 +126,7 @@ class GraphWindow:
         self._checkBoxCategories = {}
 
     def _get_possibleDateTimes(self) -> List[datetime]:
-        self._possibleDateTimes = get_allPossibleDateTimes()
+        self.refresh_available_options()
         return self._possibleDateTimes
 
     def _get_allProducts(self) -> List[str]:
@@ -159,7 +170,7 @@ class GraphWindow:
         index 0 is if the query is in valid state
         index 1 is reason if query is not in valid state
         """
-        if self._selectedTimeFrame:
+        if len(self._selectedTimeFrame) == 2:
             return [True, "All good mate! :)"]
         else:
             return [False, "SELECT PROPER TIME FRAME >:("]

@@ -1022,6 +1022,289 @@ def _write_to_csv(filepath: str, items: list, fieldnames: list[str]) -> None:
             writer.writerow({f: getattr(item, f) for f in fieldnames})
 
 
+_SALES_CSV_SPECS = {
+    "product": {
+        "filename": "products.csv",
+        "fieldnames": ["product_id", "store_id", "aisle_id", "name", "price", "order"],
+        "id_field": "product_id",
+        "table": ProductTable,
+        "converters": {
+            "product_id": int,
+            "store_id": int,
+            "aisle_id": int,
+            "name": str,
+            "price": float,
+            "order": int,
+        },
+    },
+    "checkout": {
+        "filename": "checkouts.csv",
+        "fieldnames": [
+            "checkout_id",
+            "store_id",
+            "customer_id",
+            "total_price",
+            "created_at",
+        ],
+        "id_field": "checkout_id",
+        "table": CheckoutTable,
+        "converters": {
+            "checkout_id": int,
+            "store_id": int,
+            "customer_id": int,
+            "total_price": float,
+            "created_at": "datetime",
+        },
+    },
+    "purchase": {
+        "filename": "purchases.csv",
+        "fieldnames": ["purchase_id", "product_id", "checkout_id", "quantity"],
+        "id_field": "purchase_id",
+        "table": PurchaseTable,
+        "converters": {
+            "purchase_id": int,
+            "product_id": int,
+            "checkout_id": int,
+            "quantity": int,
+        },
+    },
+}
+
+
+def _convert_csv_value(
+    raw_value,
+    converter,
+    *,
+    field_name: str,
+    file_name: str,
+    line_number: int,
+):
+    value = raw_value.strip() if isinstance(raw_value, str) else raw_value
+
+    if converter is str:
+        return "" if value is None else str(value)
+
+    if value in (None, ""):
+        raise ValueError(
+            f"{file_name} line {line_number}: missing value for '{field_name}'"
+        )
+
+    try:
+        if converter is int:
+            return int(value)
+        if converter is float:
+            return float(value)
+        if converter == "datetime":
+            return datetime.fromisoformat(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{file_name} line {line_number}: invalid value for '{field_name}': {value!r}"
+        ) from exc
+
+    raise ValueError(f"Unsupported CSV converter for '{field_name}' in {file_name}")
+
+
+def _read_sales_csv(
+    filepath: str,
+    *,
+    fieldnames: list[str],
+    converters: dict[str, object],
+) -> list[dict]:
+    with open(filepath, "r", newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        actual_fields = reader.fieldnames or []
+        missing_fields = [field for field in fieldnames if field not in actual_fields]
+        extra_fields = [field for field in actual_fields if field not in fieldnames]
+        if missing_fields or extra_fields:
+            problems = []
+            if missing_fields:
+                problems.append(f"missing columns: {', '.join(missing_fields)}")
+            if extra_fields:
+                problems.append(f"unexpected columns: {', '.join(extra_fields)}")
+            raise ValueError(
+                f"{os.path.basename(filepath)} has invalid headers ({'; '.join(problems)})"
+            )
+
+        rows = []
+        for line_number, row in enumerate(reader, start=2):
+            parsed_row = {}
+            for field_name in fieldnames:
+                parsed_row[field_name] = _convert_csv_value(
+                    row.get(field_name),
+                    converters[field_name],
+                    field_name=field_name,
+                    file_name=os.path.basename(filepath),
+                    line_number=line_number,
+                )
+            rows.append(parsed_row)
+    return rows
+
+
+def _get_existing_ids(table_cls, id_field: str) -> set[int]:
+    return {
+        getattr(row, id_field)
+        for row in table_cls.select(getattr(table_cls, id_field))
+    }
+
+
+def _find_duplicate_ids(rows: list[dict], id_field: str) -> list[int]:
+    seen = set()
+    duplicates = set()
+    for row in rows:
+        row_id = row[id_field]
+        if row_id in seen:
+            duplicates.add(row_id)
+        else:
+            seen.add(row_id)
+    return sorted(duplicates)
+
+
+def _format_ids(ids: list[int] | set[int], limit: int = 5) -> str:
+    values = sorted(ids)
+    preview = ", ".join(str(value) for value in values[:limit])
+    if len(values) > limit:
+        preview += ", ..."
+    return preview
+
+
+def _validate_sales_import_rows(
+    product_rows: list[dict],
+    checkout_rows: list[dict],
+    purchase_rows: list[dict],
+) -> None:
+    rows_by_type = {
+        "product": product_rows,
+        "checkout": checkout_rows,
+        "purchase": purchase_rows,
+    }
+
+    for row_type, rows in rows_by_type.items():
+        spec = _SALES_CSV_SPECS[row_type]
+        id_field = spec["id_field"]
+        duplicate_ids = _find_duplicate_ids(rows, id_field)
+        if duplicate_ids:
+            raise ValueError(
+                f"Duplicate {row_type} IDs in {spec['filename']}: {_format_ids(duplicate_ids)}"
+            )
+
+        existing_ids = _get_existing_ids(spec["table"], id_field)
+        conflicting_ids = {
+            row[id_field] for row in rows if row[id_field] in existing_ids
+        }
+        if conflicting_ids:
+            raise ValueError(
+                f"{spec['filename']} contains IDs already in the database: "
+                f"{_format_ids(conflicting_ids)}"
+            )
+
+    store_ids = _get_existing_ids(StoreTable, "store_id")
+    aisle_ids = _get_existing_ids(AisleTable, "aisle_id")
+    customer_ids = _get_existing_ids(CustomerTable, "customer_id")
+
+    missing_product_store_ids = {
+        row["store_id"] for row in product_rows if row["store_id"] not in store_ids
+    }
+    if missing_product_store_ids:
+        raise ValueError(
+            "products.csv references store IDs that are not in the database: "
+            f"{_format_ids(missing_product_store_ids)}"
+        )
+
+    missing_aisle_ids = {
+        row["aisle_id"] for row in product_rows if row["aisle_id"] not in aisle_ids
+    }
+    if missing_aisle_ids:
+        raise ValueError(
+            "products.csv references aisle IDs that are not in the database: "
+            f"{_format_ids(missing_aisle_ids)}"
+        )
+
+    missing_checkout_store_ids = {
+        row["store_id"] for row in checkout_rows if row["store_id"] not in store_ids
+    }
+    if missing_checkout_store_ids:
+        raise ValueError(
+            "checkouts.csv references store IDs that are not in the database: "
+            f"{_format_ids(missing_checkout_store_ids)}"
+        )
+
+    missing_customer_ids = {
+        row["customer_id"]
+        for row in checkout_rows
+        if row["customer_id"] not in customer_ids
+    }
+    if missing_customer_ids:
+        raise ValueError(
+            "checkouts.csv references customer IDs that are not in the database: "
+            f"{_format_ids(missing_customer_ids)}"
+        )
+
+    imported_product_ids = {row["product_id"] for row in product_rows}
+    imported_checkout_ids = {row["checkout_id"] for row in checkout_rows}
+
+    missing_purchase_product_ids = {
+        row["product_id"]
+        for row in purchase_rows
+        if row["product_id"] not in imported_product_ids
+    }
+    if missing_purchase_product_ids:
+        raise ValueError(
+            "purchases.csv references product IDs missing from products.csv: "
+            f"{_format_ids(missing_purchase_product_ids)}"
+        )
+
+    missing_purchase_checkout_ids = {
+        row["checkout_id"]
+        for row in purchase_rows
+        if row["checkout_id"] not in imported_checkout_ids
+    }
+    if missing_purchase_checkout_ids:
+        raise ValueError(
+            "purchases.csv references checkout IDs missing from checkouts.csv: "
+            f"{_format_ids(missing_purchase_checkout_ids)}"
+        )
+
+
+def import_sales_data_from_csv_dir(csv_dir: str) -> dict[str, int]:
+    """Import generated sales CSV files into the database.
+
+    The folder must contain the three exports created by
+    ``generate_and_persist(include_sales_data=False)``:
+    ``products.csv``, ``checkouts.csv``, and ``purchases.csv``.
+    """
+    csv_dir = os.path.abspath(csv_dir)
+    if not os.path.isdir(csv_dir):
+        raise FileNotFoundError(f"CSV directory not found: {csv_dir}")
+
+    rows_by_type: dict[str, list[dict]] = {}
+    for row_type, spec in _SALES_CSV_SPECS.items():
+        filepath = os.path.join(csv_dir, spec["filename"])
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f"Required CSV file not found: {filepath}")
+        rows_by_type[row_type] = _read_sales_csv(
+            filepath,
+            fieldnames=spec["fieldnames"],
+            converters=spec["converters"],
+        )
+
+    _validate_sales_import_rows(
+        rows_by_type["product"],
+        rows_by_type["checkout"],
+        rows_by_type["purchase"],
+    )
+
+    with db.atomic():
+        _bulk_insert(ProductTable, rows_by_type["product"])
+        _bulk_insert(CheckoutTable, rows_by_type["checkout"])
+        _bulk_insert(PurchaseTable, rows_by_type["purchase"])
+
+    return {
+        "product_count": len(rows_by_type["product"]),
+        "checkout_count": len(rows_by_type["checkout"]),
+        "purchase_count": len(rows_by_type["purchase"]),
+    }
+
+
 def generate_and_persist(
     store_id: int = 1,
     num_customers: int = 1000,

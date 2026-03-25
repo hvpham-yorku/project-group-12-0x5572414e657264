@@ -66,6 +66,9 @@ class Singleton:
     # def get_databaseObj(self) -> pw.SqliteDatabase:
     #     return self._database
 
+    def reset_graphWindowObj(self) -> None:
+        self._graphWindowObj = GraphWindow()
+
     def get_graphWindowObj(self) -> GraphWindow:
         return self._graphWindowObj
 
