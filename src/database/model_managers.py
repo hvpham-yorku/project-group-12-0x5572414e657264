@@ -2,6 +2,7 @@
 model manager functions to make it easier to retrieve and store data into the database
 """
 
+from datetime import datetime
 from typing import List, Optional
 
 from src.database.models import (
@@ -28,7 +29,7 @@ from src.database.database_setup import (
 )
 from src.database.utils import safe_int, safe_float, safe_str, safe_bool, safe_datetime
 
-import pprint
+from collections import defaultdict
 
 
 def _row_to_store(row: StoreTable) -> Store:
@@ -582,13 +583,14 @@ def get_allProductsAndProductCategories() -> list[str]:
     products = ProductTable.select()
     aisles = AisleTable.select()
     ret = []
-    for product in products:
-        ret.append(str(product.name) + "#ID: " + str(product.product_id))
-
     for aisle in aisles:
         ret.append("Category: " + str(aisle.aisle_id))
 
-    longestStr = max(len(s) for s in ret)
+    for product in products:
+        ret.append(str(product.name) + "#ID: " + str(product.product_id))
+
+    if ret:
+        longestStr = max(len(s) for s in ret)
     ret = [s.ljust(longestStr) for s in ret]
     return ret
 
@@ -603,4 +605,75 @@ def get_allDemographicCategories() -> list[str]:
         ages.add(str(data.age))
     ret.extend(list(genders))
     ret.extend(list(ages))
+    if ret:
+        longestStr = max(len(s) for s in ret)
+    ret = [s.ljust(longestStr) for s in ret]
+    return ret
+
+
+def get_allPossibleDateTimes() -> list[str]:
+    customers = CustomerTable.select()
+    # paths = PathTable.select()
+    checkouts = CheckoutTable.select()
+    ret = set()
+    for customer in customers:
+        ret.add(customer.entered_at)
+        ret.add(customer.exited_at)
+    # for path in paths:
+    #     ret.add(path.timestamp)
+    for checkout in checkouts:
+        ret.add(checkout.created_at)
+    if None in ret:
+        ret.remove(None)
+    ret = list(ret)
+    ret.sort()
+    return ret
+
+
+def get_AllProductAndTimeDataToGraph(
+    startTime: datetime,
+    endTime: datetime,
+    ages: list[str],
+    genders: list[str],
+    products: list[str],
+    productCategories: list[str],
+    countTypeSelected: str,
+) -> list:
+    purchases = PurchaseTable.select()
+    ret = [[], []]
+    data = defaultdict(int)
+    # ret is count, tags
+    # if countTypeSelected == "product":
+    for purchase in purchases:
+        purchaseObj = ProductTable.get(ProductTable.product_id == purchase.product_id)
+        checkoutObj = CheckoutTable.get(
+            CheckoutTable.checkout_id == purchase.checkout_id
+        )
+        customerObj = CustomerTable.get(
+            CustomerTable.customer_id == checkoutObj.customer_id
+        )
+        productObj = ProductTable.get(ProductTable.product_id == purchaseObj.product_id)
+        # print(createdTime.created_at)
+        createdTime = checkoutObj.created_at
+        age = customerObj.age
+        sex = customerObj.sex
+        product = productObj.name
+        category = str(productObj.aisle_id)
+        # print(f"FOR {age} looking through {ages} bool: {age in ages}")
+        if (
+            createdTime is not None
+            and createdTime >= startTime
+            and createdTime <= endTime
+            and (age in ages or sex in genders)
+            and (category in productCategories or product in products)
+        ):
+            # data[purchaseObj.name] += 1
+            if countTypeSelected == "product":
+                data[purchaseObj.name] += 1
+            else:
+                data[age] += 1
+
+    for key in data.keys():
+        ret[0].append(data[key])
+        ret[1].append(key + " (" + str(data[key]) + ")")
     return ret

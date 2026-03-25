@@ -15,6 +15,7 @@ from tkinter import filedialog
 import platform
 import subprocess
 import webbrowser
+from src.logic.dataGenerator import generate_and_persist
 
 SINGLETON = singleton.Singleton()
 
@@ -54,6 +55,14 @@ def openAddStorePopup(sender, app_data, user_data):
 
 def openWipeDatabasePopup(sender, app_data, user_data):
     wipeDatabasePopup.open_wipe_database_popup()
+
+
+def callback_populateDataBaseWithDemoData(sender, app_data, user_data):
+    generate_and_persist(include_sales_data=True)
+
+
+def callback_populateDataBaseWithDemoDataNoSales(sender, app_data, user_data):
+    generate_and_persist(include_sales_data=False)
 
 
 def delete_orphaned_database_videos(sender, app_data, user_data):
@@ -116,6 +125,14 @@ def menuBar():
 
             with dpg.menu(label="Settings"):
                 dpg.add_menu_item(label="DATABASE WIPE", callback=openWipeDatabasePopup)
+                dpg.add_menu_item(
+                    label="Add demo data to database",
+                    callback=callback_populateDataBaseWithDemoData,
+                )
+                dpg.add_menu_item(
+                    label="Add demo data to database no sales",
+                    callback=callback_populateDataBaseWithDemoDataNoSales,
+                )
                 # dpg.add_menu_item(label="Setting 1", callback=feature_not_implemented, check=True)
                 # dpg.add_menu_item(label="Setting 2", callback=feature_not_implemented)
         with dpg.menu(label="Data"):

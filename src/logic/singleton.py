@@ -37,7 +37,7 @@ class Singleton:
     def __init__(self, value=None):
         # 1. Check if the instance already has the '_initialized' flag
         if not hasattr(self, "_initialized"):
-            print("Running __init__ for the first time...")
+            # print("Running __init__ for the first time...")
             self._tempFolder = get_data_path("videos")
             self._tempFolderPictures = get_data_path("pictures")
             self._databaseVideoFolder = get_data_path("databaseVideos")
@@ -46,7 +46,6 @@ class Singleton:
             os.makedirs(self._databaseVideoFolder, exist_ok=True)
             self._selectedVideos = {}
             self._moveAmount = 50
-            # self._database = initialize_db()
             self._graphWindowObj = GraphWindow()
 
             # Put all your heavy setup, database connections, etc. here
@@ -55,7 +54,8 @@ class Singleton:
             # 2. Set the flag so this block is skipped next time
             self._initialized = True
         else:
-            print("__init__ was called again, but setup was bypassed.")
+            pass
+            # print("__init__ was called again, but setup was bypassed.")
 
     # def init_graphWindowObj(self) -> None:
     #     self._graphWindowObj = GraphWindow()

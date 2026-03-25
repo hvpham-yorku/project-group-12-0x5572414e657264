@@ -1,11 +1,11 @@
 import dearpygui.dearpygui as dpg
-
 from src.themes import themes
 from src.pages import mainWindow
 from src.pages import menuBar
 from src.logic import singleton
 
 from src.pages import popupWindow
+
 
 # Singleton setup
 SINGLETON = singleton.Singleton()

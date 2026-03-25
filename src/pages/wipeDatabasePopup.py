@@ -13,6 +13,7 @@ from src.database.database_setup import (
     LogTable,
 )
 from src.pages import logWindow
+from src.logic.dataGenerator import clear_database
 
 WINDOW_TAG = "wipe_database_popup"
 
@@ -24,16 +25,7 @@ def _close_popup() -> None:
 
 def _wipe_database(sender, app_data, user_data) -> None:
     try:
-        with db.atomic():
-            LogTable.delete().execute()
-            PurchaseTable.delete().execute()
-            CheckoutTable.delete().execute()
-            PathTable.delete().execute()
-            CameraTable.delete().execute()
-            ProductTable.delete().execute()
-            AisleTable.delete().execute()
-            CustomerTable.delete().execute()
-            StoreTable.delete().execute()
+        clear_database()
         logWindow.addLog(0, "Database wiped.")
     except Exception as exc:
         logWindow.addLog(2, f"Database wipe failed: {exc}")

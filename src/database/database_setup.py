@@ -122,7 +122,7 @@ class PurchaseTable(BaseTable):
     purchase_id = pw.AutoField()
     product_id = pw.IntegerField()
     checkout_id = pw.IntegerField()
-    quantity = pw.IntegerField(default=0)
+    quantity = pw.IntegerField(default=1)
 
     class Meta:
         table_name = "purchase"

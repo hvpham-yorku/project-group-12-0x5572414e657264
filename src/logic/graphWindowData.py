@@ -4,7 +4,10 @@ from src.database.model_managers import (
     get_allProducts,
     get_allProductsAndProductCategories,
     get_allDemographicCategories,
+    get_allPossibleDateTimes,
+    get_AllProductAndTimeDataToGraph,
 )
+from datetime import datetime
 
 # from src.database.model_managers import (
 #     get_all_categories,
@@ -23,8 +26,97 @@ class GraphWindow:
         self._chartType = "NONE"
         self._categoriesAvailable = get_allDemographicCategories()
         self._countsAvailable = get_allProductsAndProductCategories()
-        self._categorySelected = "NONE"
+        self._possibleDateTimes = get_allPossibleDateTimes()
+        self._countTypeSelected = "product"
         self._countsSelected = []
+        self._checkBoxCounts = {}
+        self._checkBoxCategories = {}
+        self._selectedTimeFrame = []
+
+    def getValuesToGraph(self) -> None:
+        # need to filter by time frame
+        ages = []
+        genders = []
+        products = []
+        productCategories = []
+        for category in self._checkBoxCategories.keys():
+            if self._checkBoxCategories[category]:
+                if category[0] == "M" or category[0] == "F":
+                    genders.append(category[0])
+                else:
+                    ages.append(category)
+        for product in self._checkBoxCounts.keys():
+            if self._checkBoxCounts[product]:
+                # check if it is a product or an aisle
+                if "#" in product:
+                    # then this is a product
+                    tempProductName = product.rstrip()
+                    products.append(tempProductName[: tempProductName.index("#")])
+                else:
+                    tempProductCategoryName = product.rstrip()
+                    productCategories.append(
+                        tempProductCategoryName[
+                            tempProductCategoryName.index(":") + 2 :
+                        ]
+                    )
+        return get_AllProductAndTimeDataToGraph(
+            self._selectedTimeFrame[0],
+            self._selectedTimeFrame[1],
+            ages,
+            genders,
+            products,
+            productCategories,
+            self._countTypeSelected,
+        )
+
+    def resetSelectedTimeFrame(self) -> None:
+        self._selectedTimeFrame = []
+
+    def setSelectedTimeFrame(self, time1: datetime, time2: datetime) -> None:
+        self._selectedTimeFrame = [time1, time2]
+
+    def set_checkBoxCounts(self, box: str, newValue: bool) -> None:
+        self._checkBoxCounts[box] = newValue
+
+    def set_checkBoxCategories(self, box: str, newValue: bool) -> None:
+        self._checkBoxCategories[box] = newValue
+
+    def get_checkBoxCountsTrue(self) -> None:
+        ret = []
+        for key in self._checkBoxCounts.keys():
+            if self._checkBoxCounts[key]:
+                ret.append(key)
+        return ret
+
+    def get_checkBoxCategoriesTrue(self) -> None:
+        ret = []
+        counter = 0
+        maxPerLine = 3
+        if self._countTypeSelected == "product":
+            for key in self._checkBoxCategories.keys():
+                if self._checkBoxCategories[key]:
+                    if counter > maxPerLine:
+                        ret.append("\n")
+                        counter = 0
+                    ret.append(key.rstrip())
+                    counter += 1
+        else:
+            for key in self._checkBoxCounts.keys():
+                if self._checkBoxCounts[key]:
+                    if counter > maxPerLine:
+                        ret.append("\n")
+                        counter = 0
+                    ret.append(key.rstrip())
+                    counter += 1
+        return ret
+
+    def clearBoxesValues(self) -> None:
+        self._checkBoxCounts = {}
+        self._checkBoxCategories = {}
+
+    def _get_possibleDateTimes(self) -> List[datetime]:
+        self._possibleDateTimes = get_allPossibleDateTimes()
+        return self._possibleDateTimes
 
     def _get_allProducts(self) -> List[str]:
         pass
@@ -47,21 +139,30 @@ class GraphWindow:
     def set_chartType(self, chartType: str) -> None:
         self._chartType = chartType
 
-    def set_categorySelected(self, categorySelected: str) -> None:
-        self._categorySelected = categorySelected
+    def get_dataTypeIsCountAndCategory(self) -> None:
+        return self._countTypeSelected
+
+    def _set_dataTypeIsCountAndCategory(self) -> None:
+        if self._countTypeSelected == "product":
+            self._countTypeSelected = "demographic"
+        else:
+            self._countTypeSelected = "product"
 
     def set_countsSelected(self, countsSelected: List[str]) -> None:
         self._countsSelected = countsSelected
 
     def swap_category_and_counted(self) -> None:
-        self._categoriesAvailable, self._countsAvailable = (
-            self._countsAvailable,
-            self._categoriesAvailable,
-        )
+        self._set_dataTypeIsCountAndCategory()
 
     def is_validState(self) -> List[bool, str]:
         """
         index 0 is if the query is in valid state
         index 1 is reason if query is not in valid state
         """
-        pass
+        if self._selectedTimeFrame:
+            return [True, "All good mate! :)"]
+        else:
+            return [False, "SELECT PROPER TIME FRAME >:("]
+
+    def test_func(self):
+        return get_AllProductAndTimeDataToGraph()

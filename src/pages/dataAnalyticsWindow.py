@@ -6,43 +6,138 @@ from src.logic.singleton import Singleton
 
 
 def callback_update_charts(sender, app_data, user_data):
+    s = Singleton().get_graphWindowObj()
     chartType = dpg.get_value("chart_type_dropdown")
+    isValidState, errorMessage = s.is_validState()
+    if not isValidState:
+        chartType = "INVALID"
     match chartType:
         case "Pie Chart":
+            newLabel = " + ".join(s.get_checkBoxCategoriesTrue())
+            data = s.getValuesToGraph()
+            if not data[0]:
+                display_modal_popup(2, "No data to display.... :(")
+            dpg.configure_item("pieSeries", values=data[0], labels=data[1])
+            dpg.configure_item("graphPie", label=newLabel)
             dpg.configure_item("graphPie", show=True)
-            display_modal_popup(2, "NOT IMPLEMENTED YET")
         case "Line Chart":
             dpg.configure_item("graphPie", show=False)
             display_modal_popup(2, "NOT IMPLEMENTED YET")
-        case "_":
+        case "INVALID":
+            display_modal_popup(2, errorMessage)
+        case _:
             display_modal_popup(2, "Please select a chart type! :)")
 
 
-def callback_save_checked_boxes(sender, app_data, user_data):
-    print()
+def callback_saveCheckBoxCounts(sender, app_data, user_data):
+    Singleton().get_graphWindowObj().set_checkBoxCounts(
+        user_data, dpg.get_value(user_data)
+    )
+
+
+def callback_saveCheckBoxCategories(sender, app_data, user_data):
+    Singleton().get_graphWindowObj().set_checkBoxCategories(
+        user_data, dpg.get_value(user_data)
+    )
 
 
 def callback_swapCategoriesAndCounts(sender, app_data, user_data):
+    table_rowsCounts = dpg.get_item_children(
+        "countsSelector", 1
+    )  # 1 specifies child slot for table rows
+    for row in table_rowsCounts:
+        dpg.delete_item(row)
+
+    table_rowsCategories = dpg.get_item_children(
+        "categorySelector", 1
+    )  # 1 specifies child slot for table rows
+    for row in table_rowsCategories:
+        dpg.delete_item(row)
     Singleton().get_graphWindowObj().swap_category_and_counted()
+    populateDropDowns()
+
+
+def callback_test():
+    print(Singleton().get_graphWindowObj().test_func())
+
     # TODO refresh dropdown boxes
 
 
-def populateCountAndCategories() -> None:
+def populateDropDowns() -> None:
     s = Singleton().get_graphWindowObj()
+    s.clearBoxesValues()
+    parent = []
+    if s.get_dataTypeIsCountAndCategory() == "product":
+        parent.append("countsSelector")
+        parent.append("categorySelector")
+    else:
+        parent.append("categorySelector")
+        parent.append("countsSelector")
+
     for countStr in s.get_countsAvailable():
-        with dpg.table_row(parent="countsSelector"):
+        with dpg.table_row(parent=parent[0]):
             with dpg.group(horizontal=True):
                 dpg.add_text(countStr)
                 dpg.add_checkbox(
-                    callback=callback_save_checked_boxes,
+                    callback=callback_saveCheckBoxCounts,
                     default_value=False,
+                    tag=countStr,
+                    user_data=countStr,
                 )
-    with dpg.table_row(parent="categorySelector"):
-        dpg.add_radio_button(
-            label="testing",
-            items=s.get_categoriesAvailable(),
-            callback=callback_save_checked_boxes,
+    for category in s.get_categoriesAvailable():
+        with dpg.table_row(parent=parent[1]):
+            with dpg.group(horizontal=True):
+                dpg.add_text(category)
+                dpg.add_checkbox(
+                    callback=callback_saveCheckBoxCategories,
+                    default_value=False,
+                    tag=category,
+                    user_data=category,
+                )
+        # dpg.add_radio_button(
+        #     label="testing",
+        #     items=s.get_categoriesAvailable(),
+        #     callback=callback_save_checked_boxes,
+        # )
+    possibleDateTimes = Singleton().get_graphWindowObj()._get_possibleDateTimes()
+    possibleDateTimes = [str(x) for x in possibleDateTimes]
+    possibleDateTimes = ["Select Start Time"] + possibleDateTimes
+    dpg.configure_item("StartTimes", items=possibleDateTimes)
+    dpg.configure_item("EndTimes", default_value="Select End Time")
+    s.resetSelectedTimeFrame()
+
+
+def callback_startTimeSelected(sender, app_data, user_data):
+    dpg.get_value("problem_difficulty_dropdown")
+    selected = dpg.get_value("StartTimes")
+    if selected == "Select Start Time":
+        dpg.configure_item("EndTimes", items=["Select End Time"])
+    else:
+        print(selected)
+        possibleDateTimes = Singleton().get_graphWindowObj()._get_possibleDateTimes()
+        strDateTimeDic = {}
+        for date in possibleDateTimes:
+            strDateTimeDic[str(date)] = date
+        possibleDateTimes = possibleDateTimes[
+            possibleDateTimes.index(strDateTimeDic[selected]) :
+        ]
+        possibleDateTimes = ["Select End Time"] + [str(x) for x in possibleDateTimes]
+        dpg.configure_item(
+            "EndTimes",
+            items=possibleDateTimes,
         )
+
+
+def callback_EndTimeSelected(sender, app_data, user_data):
+    start = dpg.get_value("StartTimes")
+    end = dpg.get_value("EndTimes")
+    possibleDateTimes = Singleton().get_graphWindowObj()._get_possibleDateTimes()
+    strDateTimeDic = {}
+    for date in possibleDateTimes:
+        strDateTimeDic[str(date)] = date
+    Singleton().get_graphWindowObj().setSelectedTimeFrame(
+        strDateTimeDic[start], strDateTimeDic[end]
+    )
 
 
 def create_data_analytics_window(parent: str):
@@ -52,18 +147,40 @@ def create_data_analytics_window(parent: str):
         # width=FRAME_WIDTH,
         # height=FRAME_HEIGHT,
     ):
+        dpg.add_button(
+            label="test",
+            callback=callback_test,
+        )
+
         dpg.add_combo(
             ["Select Chart Type", "Pie Chart", "Line Chart"],
             label="Chart Type",
             default_value="Select Chart Type",
             tag="chart_type_dropdown",
+            fit_width=True,
         )
+        with dpg.group(horizontal=True):
+            dpg.add_combo(
+                ["Select Start Time"],
+                tag="StartTimes",
+                default_value="Select Start Time",
+                callback=callback_startTimeSelected,
+                fit_width=True,
+            )
+            dpg.add_combo(
+                ["Select End Time"],
+                tag="EndTimes",
+                default_value="Select End Time",
+                callback=callback_EndTimeSelected,
+                fit_width=True,
+            )
 
         # with dpg.group(horizontal=True):
         #     dpg.add_combo(["poducts", "category"])
         #     dpg.add_combo(["age", "category"])
         dpg.add_button(
-            label="Swap Categories and Counts Types", callback=callback_update_charts
+            label="Swap Categories and Counts Types",
+            callback=callback_swapCategoriesAndCounts,
         )
         with dpg.table(
             tag="dataSelectorOfSelector",
@@ -79,36 +196,13 @@ def create_data_analytics_window(parent: str):
                     show=True,
                 ):
                     dpg.add_table_column()
-                    # dpg.add_table_column(label="Categories", init_width_or_weight=0.5)
-                    # with dpg.table_row(parent="countsSelector"):
-                    #     # dpg.add_text("test")
-                    #     dpg.add_checkbox(
-                    #         callback=callback_save_checked_boxes,
-                    #         default_value=False,
-                    #     )
-                    #     dpg.add_checkbox(
-                    #         callback=callback_save_checked_boxes,
-                    #         default_value=False,
-                    #     )
-                    #     dpg.add_checkbox(
-                    #         callback=callback_save_checked_boxes,
-                    #         default_value=False,
-                    #     )
                 with dpg.table(
                     tag="categorySelector",
                     label="categorySelector",
                     show=True,
                 ):
                     dpg.add_table_column()
-                    # dpg.add_table_column(label="Categories", init_width_or_weight=0.5)
-                    # with dpg.table_row(parent="categorySelector"):
-                    #     # dpg.add_text("test")
-                    #     dpg.add_radio_button(
-                    #         label="testing",
-                    #         items=["test1", "test2"],
-                    #         callback=callback_save_checked_boxes,
-                    #     )
-        populateCountAndCategories()
+        populateDropDowns()
 
         dpg.add_button(label="Update Chart", callback=callback_update_charts)
         # 1. Create a plot environment
@@ -144,17 +238,3 @@ def create_data_analytics_window(parent: str):
                     format="%.1f%%",  # The text format shown when hovering over slices
                     tag="pieSeries",
                 )
-        # dpg.add_text("Import Sales Data")
-        # # dpg.add_button(label="Refresh Table", callback=refresh_table_callback)
-        # with dpg.table(
-        #     tag="posData",
-        #     show=True,
-        #     header_row=True,
-        #     resizable=True,
-        #     borders_innerV=True,
-        #     borders_outerV=True,
-        # ):
-        #     dpg.add_table_column(label="01", init_width_or_weight=0.25)
-        #     dpg.add_table_column(label="02", init_width_or_weight=0.25)
-        #     dpg.add_table_column(label="03", init_width_or_weight=0.25)
-        #     dpg.add_table_column(label="04", init_width_or_weight=0.25)

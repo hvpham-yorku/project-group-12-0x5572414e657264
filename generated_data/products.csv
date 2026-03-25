@@ -1,0 +1,151 @@
+product_id,store_id,aisle_id,name,price,order
+1,1,1,White Bread,2.49,1
+2,1,1,Whole Wheat Bread,3.29,1
+3,1,1,Sourdough Loaf,4.99,2
+4,1,1,Rye Bread,3.49,2
+5,1,1,Bagels (6-pack),3.99,3
+6,1,1,Croissants (4-pack),5.49,4
+7,1,1,English Muffins,3.29,4
+8,1,1,Pita Bread,2.99,5
+9,1,1,Tortillas (10-pack),3.49,5
+10,1,1,Hamburger Buns (8-pack),2.99,6
+11,1,1,Hot Dog Buns (8-pack),2.99,6
+12,1,1,Cinnamon Raisin Bread,3.79,7
+13,1,1,Banana Bread,4.49,8
+14,1,1,Dinner Rolls (12-pack),3.99,8
+15,1,1,Baguette,2.49,9
+16,1,1,Cornbread Mix,2.29,10
+17,1,1,Naan Bread (4-pack),3.99,10
+18,1,1,Brioche Rolls,4.29,11
+19,1,1,Multigrain Bread,3.49,12
+20,1,1,Ciabatta Rolls (4-pack),3.99,12
+21,1,1,Challah Bread,5.49,13
+22,1,1,Pumpernickel Bread,3.79,13
+23,1,1,Flatbread,3.29,14
+24,1,1,Crumpets (6-pack),3.49,15
+25,1,1,Breadsticks,2.99,15
+26,1,1,Garlic Bread,3.49,16
+27,1,1,Focaccia,4.49,17
+28,1,1,Marble Rye,3.79,17
+29,1,1,Oat Bread,3.29,18
+30,1,1,Gluten-Free Bread,5.99,18
+31,1,2,Chicken Noodle Soup,1.99,1
+32,1,2,Tomato Soup,1.49,1
+33,1,2,Cream of Mushroom Soup,1.79,2
+34,1,2,Vegetable Soup,1.79,2
+35,1,2,Minestrone Soup,2.29,3
+36,1,2,Lentil Soup,1.99,3
+37,1,2,Clam Chowder,2.49,4
+38,1,2,Beef Stew,2.99,4
+39,1,2,Chili with Beans,2.49,5
+40,1,2,Black Beans,1.29,6
+41,1,2,Kidney Beans,1.29,6
+42,1,2,Chickpeas,1.49,7
+43,1,2,Canned Corn,1.19,8
+44,1,2,Canned Peas,1.19,8
+45,1,2,Canned Green Beans,1.19,9
+46,1,2,Diced Tomatoes,1.49,9
+47,1,2,Tomato Paste,0.99,10
+48,1,2,Tomato Sauce,1.29,10
+49,1,2,Canned Tuna,1.99,11
+50,1,2,Canned Salmon,3.49,11
+51,1,2,Canned Sardines,2.49,12
+52,1,2,Canned Peaches,1.99,13
+53,1,2,Canned Pineapple,1.79,13
+54,1,2,Canned Mandarin Oranges,1.49,14
+55,1,2,Canned Pumpkin,2.29,14
+56,1,2,Coconut Milk,1.99,15
+57,1,2,Evaporated Milk,1.49,16
+58,1,2,Sweetened Condensed Milk,1.79,16
+59,1,2,Canned Olives,2.49,17
+60,1,2,Canned Artichoke Hearts,2.99,17
+61,1,3,Potato Chips (Original),3.99,1
+62,1,3,BBQ Potato Chips,3.99,1
+63,1,3,Sour Cream & Onion Chips,3.99,2
+64,1,3,Tortilla Chips,3.49,2
+65,1,3,Pretzels,2.99,3
+66,1,3,Cheese Puffs,3.49,3
+67,1,3,Butter Popcorn,3.29,4
+68,1,3,Kettle Corn,3.49,4
+69,1,3,Trail Mix,4.99,5
+70,1,3,Mixed Nuts,5.99,6
+71,1,3,Almonds,6.49,6
+72,1,3,Cashews,7.49,7
+73,1,3,Salted Peanuts,3.49,7
+74,1,3,Granola Bars (6-pack),3.99,8
+75,1,3,Protein Bars (4-pack),5.99,8
+76,1,3,Rice Cakes,2.99,9
+77,1,3,Saltine Crackers,2.49,10
+78,1,3,Wheat Crackers,3.29,10
+79,1,3,Cheese Crackers,3.49,11
+80,1,3,Graham Crackers,3.29,11
+81,1,3,Animal Crackers,2.99,12
+82,1,3,Beef Jerky,6.99,13
+83,1,3,Dried Mango,3.99,14
+84,1,3,Dried Cranberries,3.49,14
+85,1,3,Fruit Snacks,3.29,15
+86,1,3,Veggie Straws,3.49,15
+87,1,3,Pita Chips,3.29,16
+88,1,3,Salsa (Jar),3.49,17
+89,1,3,Hummus,3.99,17
+90,1,3,Guacamole,4.49,18
+91,1,4,Spring Water (24-pack),4.99,1
+92,1,4,Sparkling Water (12-pack),5.99,1
+93,1,4,Cola (12-pack),6.49,2
+94,1,4,Diet Cola (12-pack),6.49,2
+95,1,4,Lemon-Lime Soda (12-pack),6.49,3
+96,1,4,Ginger Ale (12-pack),6.49,3
+97,1,4,Orange Juice (64 oz),4.49,4
+98,1,4,Apple Juice (64 oz),3.99,4
+99,1,4,Grape Juice (64 oz),4.29,5
+100,1,4,Cranberry Juice (64 oz),4.49,5
+101,1,4,Lemonade (64 oz),3.49,6
+102,1,4,Iced Tea (64 oz),3.29,6
+103,1,4,Green Tea (20-pack),4.99,7
+104,1,4,Black Tea (20-pack),3.99,7
+105,1,4,Herbal Tea (20-pack),4.49,8
+106,1,4,Ground Coffee (12 oz),7.99,9
+107,1,4,Whole Bean Coffee (12 oz),9.99,9
+108,1,4,Instant Coffee,5.49,10
+109,1,4,Coffee Pods (12-pack),8.99,10
+110,1,4,Hot Chocolate Mix,3.99,11
+111,1,4,Almond Milk (64 oz),3.49,12
+112,1,4,Oat Milk (64 oz),4.29,12
+113,1,4,Soy Milk (64 oz),3.29,13
+114,1,4,Coconut Water,2.49,13
+115,1,4,Sports Drink (8-pack),6.99,14
+116,1,4,Energy Drink (4-pack),7.49,14
+117,1,4,Tomato Juice (46 oz),3.49,15
+118,1,4,Vegetable Juice (46 oz),3.99,15
+119,1,4,Kombucha,3.49,16
+120,1,4,Protein Shake (4-pack),7.99,16
+121,1,5,Whole Milk (1 gal),3.99,1
+122,1,5,2% Milk (1 gal),3.89,1
+123,1,5,Skim Milk (1 gal),3.79,2
+124,1,5,Heavy Cream (16 oz),3.49,3
+125,1,5,Half and Half (32 oz),3.29,3
+126,1,5,Unsalted Butter,4.49,4
+127,1,5,Salted Butter,4.49,4
+128,1,5,Cream Cheese (8 oz),2.49,5
+129,1,5,Cheddar Cheese (8 oz),3.99,6
+130,1,5,Mozzarella Cheese (8 oz),3.79,6
+131,1,5,Swiss Cheese (8 oz),4.29,7
+132,1,5,Grated Parmesan Cheese,4.99,7
+133,1,5,Vanilla Yogurt (32 oz),4.49,8
+134,1,5,"Greek Yogurt (Plain, 32 oz)",5.49,8
+135,1,5,Sour Cream (16 oz),2.49,9
+136,1,5,Cottage Cheese (16 oz),3.29,9
+137,1,5,Eggs (12-pack),3.49,10
+138,1,5,Egg Whites (32 oz),4.99,10
+139,1,5,Vanilla Ice Cream (48 oz),4.99,11
+140,1,5,Chocolate Ice Cream (48 oz),4.99,11
+141,1,5,Frozen Pizza (Cheese),5.49,12
+142,1,5,Frozen Pizza (Pepperoni),5.99,12
+143,1,5,Frozen Mixed Vegetables,2.49,13
+144,1,5,Frozen Broccoli,2.29,13
+145,1,5,Frozen Corn,2.29,14
+146,1,5,Frozen French Fries,3.49,14
+147,1,5,Frozen Chicken Nuggets,6.49,15
+148,1,5,Frozen Fish Fillets,7.49,15
+149,1,5,Frozen Burritos (8-pack),5.99,16
+150,1,5,Frozen Waffles (10-pack),3.49,16
