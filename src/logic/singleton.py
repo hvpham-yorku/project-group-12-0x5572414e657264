@@ -4,6 +4,8 @@ from pathlib import Path
 from src.pages import logWindow
 from src.utils.paths import get_data_path
 from src.logic.graphWindowData import GraphWindow
+import peewee as pw
+from src.database.database_setup import initialize_db, close_db
 
 
 # TODO later we can have the user adjust the move amount
@@ -23,6 +25,7 @@ class Singleton:
     _moveAmount: int
     _databaseVideoFolder: str
     _graphWindowObj: GraphWindow
+    _database: pw.SqliteDatabase
 
     def __init__(self):
         self._tempFolder = get_data_path("videos")
@@ -33,7 +36,17 @@ class Singleton:
         os.makedirs(self._databaseVideoFolder, exist_ok=True)
         self._selectedVideos = {}
         self._moveAmount = 50
+        # self._database = initialize_db()
         self._graphWindowObj = GraphWindow()
+
+    # def init_graphWindowObj(self) -> None:
+    #     self._graphWindowObj = GraphWindow()
+
+    # def init_databaseObj(self) -> None:
+    #     self._databse = initialize_db()
+
+    # def get_databaseObj(self) -> pw.SqliteDatabase:
+    #     return self._database
 
     def get_graphWindowObj(self) -> GraphWindow:
         return self._graphWindowObj

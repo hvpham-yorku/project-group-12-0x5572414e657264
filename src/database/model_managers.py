@@ -5,13 +5,30 @@ model manager functions to make it easier to retrieve and store data into the da
 from typing import List, Optional
 
 from src.database.models import (
-    Store, Purchase, Path, Checkout, Product, Customer, Aisle, Camera, Log,
+    Store,
+    Purchase,
+    Path,
+    Checkout,
+    Product,
+    Customer,
+    Aisle,
+    Camera,
+    Log,
 )
 from src.database.database_setup import (
-    StoreTable, CustomerTable, AisleTable, ProductTable,
-    CameraTable, PathTable, CheckoutTable, PurchaseTable, LogTable,
+    StoreTable,
+    CustomerTable,
+    AisleTable,
+    ProductTable,
+    CameraTable,
+    PathTable,
+    CheckoutTable,
+    PurchaseTable,
+    LogTable,
 )
 from src.database.utils import safe_int, safe_float, safe_str, safe_bool, safe_datetime
+
+import pprint
 
 
 def _row_to_store(row: StoreTable) -> Store:
@@ -139,7 +156,10 @@ def update_store(store: Store) -> Optional[Store]:
 
 
 def delete_store(store_id: int) -> bool:
-    return StoreTable.delete().where(StoreTable.store_id == safe_int(store_id)).execute() > 0
+    return (
+        StoreTable.delete().where(StoreTable.store_id == safe_int(store_id)).execute()
+        > 0
+    )
 
 
 def add_customer(customer: Customer) -> Customer:
@@ -232,7 +252,10 @@ def update_aisle(aisle: Aisle) -> Optional[Aisle]:
 
 
 def delete_aisle(aisle_id: int) -> bool:
-    return AisleTable.delete().where(AisleTable.aisle_id == safe_int(aisle_id)).execute() > 0
+    return (
+        AisleTable.delete().where(AisleTable.aisle_id == safe_int(aisle_id)).execute()
+        > 0
+    )
 
 
 def add_product(product: Product) -> Product:
@@ -309,9 +332,7 @@ def get_camera_by_id(camera_id: int) -> Optional[Camera]:
 def get_cameras_by_store(store_id: int) -> List[Camera]:
     return [
         _row_to_camera(r)
-        for r in CameraTable.select().where(
-            CameraTable.store_id == safe_int(store_id)
-        )
+        for r in CameraTable.select().where(CameraTable.store_id == safe_int(store_id))
     ]
 
 
@@ -379,7 +400,9 @@ def update_path(path: Path) -> Optional[Path]:
 
 
 def delete_path(path_id: int) -> bool:
-    return PathTable.delete().where(PathTable.path_id == safe_int(path_id)).execute() > 0
+    return (
+        PathTable.delete().where(PathTable.path_id == safe_int(path_id)).execute() > 0
+    )
 
 
 def add_checkout(checkout: Checkout) -> Checkout:
@@ -537,3 +560,47 @@ def update_log(log: Log) -> Optional[Log]:
 
 def delete_log(log_id: int) -> bool:
     return LogTable.delete().where(LogTable.log_id == safe_int(log_id)).execute() > 0
+
+
+def get_allProductCategories():
+    aisles = AisleTable.select()
+    ret = []
+    for aisle in aisles:
+        ret.append(str(aisle.aisle_id))
+    return ret
+
+
+def get_allProducts() -> list[str]:
+    products = ProductTable.select()
+    ret = []
+    for product in products:
+        ret.append(str(product.product_id) + "#" + str(product.name))
+    return ret
+
+
+def get_allProductsAndProductCategories() -> list[str]:
+    products = ProductTable.select()
+    aisles = AisleTable.select()
+    ret = []
+    for product in products:
+        ret.append(str(product.name) + "#ID: " + str(product.product_id))
+
+    for aisle in aisles:
+        ret.append("Category: " + str(aisle.aisle_id))
+
+    longestStr = max(len(s) for s in ret)
+    ret = [s.ljust(longestStr) for s in ret]
+    return ret
+
+
+def get_allDemographicCategories() -> list[str]:
+    demoData = CustomerTable.select()
+    genders = set()
+    ages = set()
+    ret = []
+    for data in demoData:
+        genders.add(str(data.sex))
+        ages.add(str(data.age))
+    ret.extend(list(genders))
+    ret.extend(list(ages))
+    return ret

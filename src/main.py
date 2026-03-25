@@ -7,6 +7,7 @@ from src.logic import singleton
 
 from src.pages import popupWindow
 
+# Singleton setup
 SINGLETON = singleton.Singleton()
 
 

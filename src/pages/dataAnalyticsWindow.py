@@ -9,8 +9,10 @@ def callback_update_charts(sender, app_data, user_data):
     chartType = dpg.get_value("chart_type_dropdown")
     match chartType:
         case "Pie Chart":
+            dpg.configure_item("graphPie", show=True)
             display_modal_popup(2, "NOT IMPLEMENTED YET")
         case "Line Chart":
+            dpg.configure_item("graphPie", show=False)
             display_modal_popup(2, "NOT IMPLEMENTED YET")
         case "_":
             display_modal_popup(2, "Please select a chart type! :)")
@@ -18,6 +20,29 @@ def callback_update_charts(sender, app_data, user_data):
 
 def callback_save_checked_boxes(sender, app_data, user_data):
     print()
+
+
+def callback_swapCategoriesAndCounts(sender, app_data, user_data):
+    Singleton().get_graphWindowObj().swap_category_and_counted()
+    # TODO refresh dropdown boxes
+
+
+def populateCountAndCategories() -> None:
+    s = Singleton().get_graphWindowObj()
+    for countStr in s.get_countsAvailable():
+        with dpg.table_row(parent="countsSelector"):
+            with dpg.group(horizontal=True):
+                dpg.add_text(countStr)
+                dpg.add_checkbox(
+                    callback=callback_save_checked_boxes,
+                    default_value=False,
+                )
+    with dpg.table_row(parent="categorySelector"):
+        dpg.add_radio_button(
+            label="testing",
+            items=s.get_categoriesAvailable(),
+            callback=callback_save_checked_boxes,
+        )
 
 
 def create_data_analytics_window(parent: str):
@@ -33,7 +58,13 @@ def create_data_analytics_window(parent: str):
             default_value="Select Chart Type",
             tag="chart_type_dropdown",
         )
+
         # with dpg.group(horizontal=True):
+        #     dpg.add_combo(["poducts", "category"])
+        #     dpg.add_combo(["age", "category"])
+        dpg.add_button(
+            label="Swap Categories and Counts Types", callback=callback_update_charts
+        )
         with dpg.table(
             tag="dataSelectorOfSelector",
             policy=dpg.mvTable_SizingStretchProp,
@@ -43,40 +74,41 @@ def create_data_analytics_window(parent: str):
             dpg.add_table_column(label="Category", init_width_or_weight=0.5)
             with dpg.table_row(parent="dataSelectorOfSelector"):
                 with dpg.table(
-                    tag="dataSelector",
-                    label="dataSelector",
+                    tag="countsSelector",
+                    label="countsSelector",
                     show=True,
                 ):
                     dpg.add_table_column()
                     # dpg.add_table_column(label="Categories", init_width_or_weight=0.5)
-                    with dpg.table_row(parent="multipleSelector"):
-                        # dpg.add_text("test")
-                        dpg.add_radio_button(
-                            label="testing",
-                            items=["test1", "test2"],
-                            callback=callback_save_checked_boxes,
-                        )
+                    # with dpg.table_row(parent="countsSelector"):
+                    #     # dpg.add_text("test")
+                    #     dpg.add_checkbox(
+                    #         callback=callback_save_checked_boxes,
+                    #         default_value=False,
+                    #     )
+                    #     dpg.add_checkbox(
+                    #         callback=callback_save_checked_boxes,
+                    #         default_value=False,
+                    #     )
+                    #     dpg.add_checkbox(
+                    #         callback=callback_save_checked_boxes,
+                    #         default_value=False,
+                    #     )
                 with dpg.table(
-                    tag="dataSelector2",
-                    label="dataSelector",
+                    tag="categorySelector",
+                    label="categorySelector",
                     show=True,
                 ):
                     dpg.add_table_column()
                     # dpg.add_table_column(label="Categories", init_width_or_weight=0.5)
-                    with dpg.table_row(parent="multipleSelector2"):
-                        # dpg.add_text("test")
-                        dpg.add_checkbox(
-                            callback=callback_save_checked_boxes,
-                            default_value=False,
-                        )
-                        dpg.add_checkbox(
-                            callback=callback_save_checked_boxes,
-                            default_value=False,
-                        )
-                        dpg.add_checkbox(
-                            callback=callback_save_checked_boxes,
-                            default_value=False,
-                        )
+                    # with dpg.table_row(parent="categorySelector"):
+                    #     # dpg.add_text("test")
+                    #     dpg.add_radio_button(
+                    #         label="testing",
+                    #         items=["test1", "test2"],
+                    #         callback=callback_save_checked_boxes,
+                    #     )
+        populateCountAndCategories()
 
         dpg.add_button(label="Update Chart", callback=callback_update_charts)
         # 1. Create a plot environment
