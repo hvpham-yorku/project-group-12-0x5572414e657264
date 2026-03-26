@@ -78,6 +78,23 @@ CHECKOUT_X_POSITIONS = [25, 50, 75]
 _CORRIDOR_Y = 12
 _BROWSE_DWELL = 20
 
+AGE_GROUPS: list[tuple[int, int]] = [
+    (18, 24),
+    (25, 34),
+    (35, 44),
+    (45, 54),
+    (55, 64),
+    (65, 78),
+]
+
+
+def _assign_age_group(age: int) -> str:
+    """Map a concrete age to its fixed demographic bin label."""
+    for lo, hi in AGE_GROUPS:
+        if lo <= age <= hi:
+            return f"({lo}-{hi})"
+    return f"({AGE_GROUPS[-1][0]}-{AGE_GROUPS[-1][1]})"
+
 
 # ──────────────────────────────────────────────────────────────
 # Product Catalog — (name, price, order)
@@ -442,9 +459,9 @@ def generate_customers(
         duration_min = random.triangular(5, 60, 20)
         exit_time = entry_time + timedelta(minutes=duration_min)
 
-        age_center = int(random.triangular(18, 78, 35))
-        half = random.randint(2, 5)
-        age_str = f"({max(15, age_center - half)}-{age_center + half})"
+        age = int(random.triangular(18, 78, 35))
+        age = max(AGE_GROUPS[0][0], min(AGE_GROUPS[-1][1], age))
+        age_str = _assign_age_group(age)
 
         sex = random.choices(["M", "F"], weights=[0.45, 0.55])[0]
 
