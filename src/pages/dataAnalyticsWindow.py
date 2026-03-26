@@ -11,6 +11,7 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 from src.database.model_managers import get_all_stores
 from src.logic import (
+    basketAnalysis,
     customerAisleAnalytics,
     customerProductAnalytics,
     sectionTimeAnalysis,
@@ -26,6 +27,12 @@ GRAPH_VIEW_TAB_BAR_TAG = "graph_view_tabs"
 GRAPH_PIE_TAB_TAG = "graph_pie_tab"
 GRAPH_ANALYTICS_TAB_TAG = "graph_analytics_tab"
 GRAPH_SIMULATION_TAB_TAG = "graph_simulation_tab"
+ANALYTICS_DATA_TAB_BAR_TAG = "analytics_data_tab_bar"
+ANALYTICS_CUSTOMER_AISLE_TAB_TAG = "analytics_customer_aisle_tab"
+ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG = "analytics_customer_attributes_tab"
+ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG = "analytics_customer_product_tab"
+ANALYTICS_SECTION_TIME_TAB_TAG = "analytics_section_time_tab"
+ANALYTICS_BASKET_TAB_TAG = "analytics_basket_tab"
 
 CUSTOMER_AISLE_GENDER_TABLE_TAG = "customer_aisle_gender_table"
 CUSTOMER_AISLE_AGE_TABLE_TAG = "customer_aisle_age_table"
@@ -33,6 +40,24 @@ CUSTOMER_PRODUCT_GENDER_TABLE_TAG = "customer_product_gender_table"
 CUSTOMER_PRODUCT_AGE_TABLE_TAG = "customer_product_age_table"
 CUSTOMER_ATTRIBUTES_TABLE_TAG = "customer_attributes_estimator_table"
 SECTION_TIME_TABLE_TAG = "section_time_analysis_table"
+BASKET_SUMMARY_TABLE_TAG = "basket_analysis_summary_table"
+BASKET_PRODUCTS_TABLE_TAG = "basket_analysis_products_table"
+BASKET_PAIRS_TABLE_TAG = "basket_analysis_pairs_table"
+CUSTOMER_AISLE_REFRESH_BUTTON_TAG = "customer_aisle_refresh_button"
+CUSTOMER_AISLE_PROGRESS_TAG = "customer_aisle_refresh_progress"
+CUSTOMER_AISLE_STATUS_TAG = "customer_aisle_refresh_status"
+CUSTOMER_ATTRIBUTES_REFRESH_BUTTON_TAG = "customer_attributes_refresh_button"
+CUSTOMER_ATTRIBUTES_PROGRESS_TAG = "customer_attributes_refresh_progress"
+CUSTOMER_ATTRIBUTES_STATUS_TAG = "customer_attributes_refresh_status"
+CUSTOMER_PRODUCT_REFRESH_BUTTON_TAG = "customer_product_refresh_button"
+CUSTOMER_PRODUCT_PROGRESS_TAG = "customer_product_refresh_progress"
+CUSTOMER_PRODUCT_STATUS_TAG = "customer_product_refresh_status"
+SECTION_TIME_REFRESH_BUTTON_TAG = "section_time_refresh_button"
+SECTION_TIME_PROGRESS_TAG = "section_time_refresh_progress"
+SECTION_TIME_STATUS_TAG = "section_time_refresh_status"
+BASKET_REFRESH_BUTTON_TAG = "basket_refresh_button"
+BASKET_PROGRESS_TAG = "basket_refresh_progress"
+BASKET_STATUS_TAG = "basket_refresh_status"
 SIMULATION_SUMMARY_TABLE_TAG = "simulation_summary_table"
 SIMULATION_AISLES_TABLE_TAG = "simulation_aisles_table"
 SIMULATION_RENDER_BUTTON_TAG = "simulation_render_button"
@@ -71,6 +96,73 @@ _SIMULATION_VIDEO_LAST_FRAME_TIME = 0.0
 _SIMULATION_VIDEO_FPS = 20.0
 _SIMULATION_VIDEO_FRAME_COUNT = 0
 _SIMULATION_VIDEO_CURRENT_FRAME = 0
+
+
+def _make_analytics_refresh_state(ready_status: str) -> dict[str, object]:
+    return {
+        "thread": None,
+        "is_refreshing": False,
+        "progress": 0.0,
+        "status": ready_status,
+        "completed": False,
+        "applied": False,
+        "has_loaded": False,
+        "payload": None,
+    }
+
+
+_ANALYTICS_REFRESH_CONFIG = {
+    "customer_aisle": {
+        "tab_tag": ANALYTICS_CUSTOMER_AISLE_TAB_TAG,
+        "table_tag": CUSTOMER_AISLE_GENDER_TABLE_TAG,
+        "button_tag": CUSTOMER_AISLE_REFRESH_BUTTON_TAG,
+        "progress_tag": CUSTOMER_AISLE_PROGRESS_TAG,
+        "status_tag": CUSTOMER_AISLE_STATUS_TAG,
+        "ready_status": "Ready to refresh customer aisle analytics.",
+        "complete_status": "Customer aisle analytics refreshed.",
+    },
+    "customer_attributes": {
+        "tab_tag": ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG,
+        "table_tag": CUSTOMER_ATTRIBUTES_TABLE_TAG,
+        "button_tag": CUSTOMER_ATTRIBUTES_REFRESH_BUTTON_TAG,
+        "progress_tag": CUSTOMER_ATTRIBUTES_PROGRESS_TAG,
+        "status_tag": CUSTOMER_ATTRIBUTES_STATUS_TAG,
+        "ready_status": "Ready to refresh customer attribute estimator data.",
+        "complete_status": "Customer attribute estimator data refreshed.",
+    },
+    "customer_product": {
+        "tab_tag": ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
+        "table_tag": CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
+        "button_tag": CUSTOMER_PRODUCT_REFRESH_BUTTON_TAG,
+        "progress_tag": CUSTOMER_PRODUCT_PROGRESS_TAG,
+        "status_tag": CUSTOMER_PRODUCT_STATUS_TAG,
+        "ready_status": "Ready to refresh customer product analytics.",
+        "complete_status": "Customer product analytics refreshed.",
+    },
+    "section_time": {
+        "tab_tag": ANALYTICS_SECTION_TIME_TAB_TAG,
+        "table_tag": SECTION_TIME_TABLE_TAG,
+        "button_tag": SECTION_TIME_REFRESH_BUTTON_TAG,
+        "progress_tag": SECTION_TIME_PROGRESS_TAG,
+        "status_tag": SECTION_TIME_STATUS_TAG,
+        "ready_status": "Ready to refresh section time analytics.",
+        "complete_status": "Section time analytics refreshed.",
+    },
+    "basket": {
+        "tab_tag": ANALYTICS_BASKET_TAB_TAG,
+        "table_tag": BASKET_SUMMARY_TABLE_TAG,
+        "button_tag": BASKET_REFRESH_BUTTON_TAG,
+        "progress_tag": BASKET_PROGRESS_TAG,
+        "status_tag": BASKET_STATUS_TAG,
+        "ready_status": "Ready to refresh basket analytics.",
+        "complete_status": "Basket analytics refreshed.",
+    },
+}
+_ANALYTICS_REFRESH_STATES = {
+    key: _make_analytics_refresh_state(config["ready_status"])
+    for key, config in _ANALYTICS_REFRESH_CONFIG.items()
+}
+_ANALYTICS_REFRESH_LOCK = threading.Lock()
 
 
 def _clear_selector_rows(table_tag: str) -> None:
@@ -374,6 +466,464 @@ def _load_section_time_analysis_rows() -> list[list[str]]:
         return _get_section_time_analysis_rows()
     except Exception as exc:
         return [[f"Failed to load data: {exc}", "", "", "", "", "", ""]]
+
+
+def _get_basket_analysis_rows() -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+    summary_rows = []
+    product_rows = []
+    pair_rows = []
+
+    for store in get_all_stores():
+        analysis = basketAnalysis.get_basket_analysis(store.store_id)
+        summary_rows.append(
+            [
+                str(store.store_id),
+                store.name,
+                str(analysis.basket_summary.total_transactions),
+                f"{analysis.basket_summary.total_revenue:.2f}",
+                f"{analysis.basket_summary.average_basket_size:.2f}",
+                f"{analysis.basket_summary.average_basket_quantity:.2f}",
+                f"{analysis.basket_summary.average_basket_value:.2f}",
+            ]
+        )
+
+        for product_summary in analysis.product_summaries:
+            product_rows.append(
+                [
+                    str(store.store_id),
+                    store.name,
+                    product_summary.product_name,
+                    str(product_summary.total_quantity_sold),
+                    str(product_summary.transaction_count),
+                    f"{product_summary.total_revenue:.2f}",
+                ]
+            )
+
+        for pair in analysis.product_pair_associations:
+            pair_rows.append(
+                [
+                    str(store.store_id),
+                    store.name,
+                    pair.product_a_name,
+                    pair.product_b_name,
+                    str(pair.co_occurrence_count),
+                    f"{pair.support:.4f}",
+                    f"{pair.confidence_a_to_b:.4f}",
+                    f"{pair.confidence_b_to_a:.4f}",
+                    f"{pair.lift:.4f}",
+                ]
+            )
+
+    return summary_rows, product_rows, pair_rows
+
+
+def _load_basket_analysis_rows() -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+    try:
+        return _get_basket_analysis_rows()
+    except Exception as exc:
+        error_text = f"Failed to load data: {exc}"
+        return (
+            [[error_text, "", "", "", "", "", ""]],
+            [[error_text, "", "", "", "", ""]],
+            [[error_text, "", "", "", "", "", "", "", ""]],
+        )
+
+
+def _emit_local_progress(progress_callback, progress: float, status: str) -> None:
+    if progress_callback is None:
+        return
+    progress_callback(max(0.0, min(progress, 1.0)), status)
+
+
+def _build_customer_aisle_analysis_payload(
+    progress_callback=None,
+) -> dict[str, tuple[list[list[str]], str, int]]:
+    _emit_local_progress(
+        progress_callback,
+        0.15,
+        "Loading most common gender by aisle...",
+    )
+    gender_rows = _load_mapping_rows(
+        customerAisleAnalytics.get_product_category_most_common_gender
+    )
+    _emit_local_progress(
+        progress_callback,
+        0.65,
+        "Loading most common age by aisle...",
+    )
+    age_rows = _load_mapping_rows(
+        customerAisleAnalytics.get_product_category_most_common_age
+    )
+    _emit_local_progress(
+        progress_callback,
+        1.0,
+        _ANALYTICS_REFRESH_CONFIG["customer_aisle"]["complete_status"],
+    )
+    return {
+        CUSTOMER_AISLE_GENDER_TABLE_TAG: (
+            gender_rows,
+            "No aisle gender analytics available.",
+            2,
+        ),
+        CUSTOMER_AISLE_AGE_TABLE_TAG: (
+            age_rows,
+            "No aisle age analytics available.",
+            2,
+        ),
+    }
+
+
+def _build_customer_attribute_analysis_payload(
+    progress_callback=None,
+) -> dict[str, tuple[list[list[str]], str, int]]:
+    _emit_local_progress(
+        progress_callback,
+        0.35,
+        "Reading estimator label definitions...",
+    )
+    estimator_rows = _load_customer_attribute_estimator_rows()
+    _emit_local_progress(
+        progress_callback,
+        1.0,
+        _ANALYTICS_REFRESH_CONFIG["customer_attributes"]["complete_status"],
+    )
+    return {
+        CUSTOMER_ATTRIBUTES_TABLE_TAG: (
+            estimator_rows,
+            "No estimator labels available.",
+            2,
+        ),
+    }
+
+
+def _build_customer_product_analysis_payload(
+    progress_callback=None,
+) -> dict[str, tuple[list[list[str]], str, int]]:
+    _emit_local_progress(
+        progress_callback,
+        0.15,
+        "Loading most common gender by product...",
+    )
+    gender_rows = _load_mapping_rows(customerProductAnalytics.get_product_most_common_gender)
+    _emit_local_progress(
+        progress_callback,
+        0.65,
+        "Loading most common age by product...",
+    )
+    age_rows = _load_mapping_rows(customerProductAnalytics.get_product_most_common_age)
+    _emit_local_progress(
+        progress_callback,
+        1.0,
+        _ANALYTICS_REFRESH_CONFIG["customer_product"]["complete_status"],
+    )
+    return {
+        CUSTOMER_PRODUCT_GENDER_TABLE_TAG: (
+            gender_rows,
+            "No product gender analytics available.",
+            2,
+        ),
+        CUSTOMER_PRODUCT_AGE_TABLE_TAG: (
+            age_rows,
+            "No product age analytics available.",
+            2,
+        ),
+    }
+
+
+def _build_section_time_analysis_payload(
+    progress_callback=None,
+) -> dict[str, tuple[list[list[str]], str, int]]:
+    rows = []
+    try:
+        stores = list(get_all_stores())
+        total_stores = max(len(stores), 1)
+        _emit_local_progress(
+            progress_callback,
+            0.05,
+            f"Processing section time analytics for {len(stores)} stores...",
+        )
+
+        for index, store in enumerate(stores, start=1):
+            summaries = sectionTimeAnalysis.get_section_time_analysis(store.store_id)
+            for summary in summaries:
+                rows.append(
+                    [
+                        str(store.store_id),
+                        store.name,
+                        str(summary.aisle_id),
+                        str(summary.section_index),
+                        f"{summary.total_time_seconds:.2f}",
+                        f"{summary.average_time_seconds:.2f}",
+                        str(summary.customer_count),
+                    ]
+                )
+            progress = 0.05 + (0.95 * (index / total_stores))
+            _emit_local_progress(
+                progress_callback,
+                progress,
+                f"Processed section times for {store.name} ({index}/{len(stores)}).",
+            )
+    except Exception as exc:
+        rows = [[f"Failed to load data: {exc}", "", "", "", "", "", ""]]
+
+    _emit_local_progress(
+        progress_callback,
+        1.0,
+        _ANALYTICS_REFRESH_CONFIG["section_time"]["complete_status"],
+    )
+    return {
+        SECTION_TIME_TABLE_TAG: (
+            rows,
+            "No section time analytics available.",
+            7,
+        ),
+    }
+
+
+def _build_basket_analysis_payload(
+    progress_callback=None,
+) -> dict[str, tuple[list[list[str]], str, int]]:
+    summary_rows = []
+    product_rows = []
+    pair_rows = []
+    try:
+        stores = list(get_all_stores())
+        total_stores = max(len(stores), 1)
+        _emit_local_progress(
+            progress_callback,
+            0.05,
+            f"Processing basket analytics for {len(stores)} stores...",
+        )
+
+        for index, store in enumerate(stores, start=1):
+            analysis = basketAnalysis.get_basket_analysis(store.store_id)
+            summary_rows.append(
+                [
+                    str(store.store_id),
+                    store.name,
+                    str(analysis.basket_summary.total_transactions),
+                    f"{analysis.basket_summary.total_revenue:.2f}",
+                    f"{analysis.basket_summary.average_basket_size:.2f}",
+                    f"{analysis.basket_summary.average_basket_quantity:.2f}",
+                    f"{analysis.basket_summary.average_basket_value:.2f}",
+                ]
+            )
+
+            for product_summary in analysis.product_summaries:
+                product_rows.append(
+                    [
+                        str(store.store_id),
+                        store.name,
+                        product_summary.product_name,
+                        str(product_summary.total_quantity_sold),
+                        str(product_summary.transaction_count),
+                        f"{product_summary.total_revenue:.2f}",
+                    ]
+                )
+
+            for pair in analysis.product_pair_associations:
+                pair_rows.append(
+                    [
+                        str(store.store_id),
+                        store.name,
+                        pair.product_a_name,
+                        pair.product_b_name,
+                        str(pair.co_occurrence_count),
+                        f"{pair.support:.4f}",
+                        f"{pair.confidence_a_to_b:.4f}",
+                        f"{pair.confidence_b_to_a:.4f}",
+                        f"{pair.lift:.4f}",
+                    ]
+                )
+
+            progress = 0.05 + (0.95 * (index / total_stores))
+            _emit_local_progress(
+                progress_callback,
+                progress,
+                f"Processed basket analytics for {store.name} ({index}/{len(stores)}).",
+            )
+    except Exception as exc:
+        error_text = f"Failed to load data: {exc}"
+        summary_rows = [[error_text, "", "", "", "", "", ""]]
+        product_rows = [[error_text, "", "", "", "", ""]]
+        pair_rows = [[error_text, "", "", "", "", "", "", "", ""]]
+
+    _emit_local_progress(
+        progress_callback,
+        1.0,
+        _ANALYTICS_REFRESH_CONFIG["basket"]["complete_status"],
+    )
+    return {
+        BASKET_SUMMARY_TABLE_TAG: (
+            summary_rows,
+            "No basket summary analytics available.",
+            7,
+        ),
+        BASKET_PRODUCTS_TABLE_TAG: (
+            product_rows,
+            "No basket product analytics available.",
+            6,
+        ),
+        BASKET_PAIRS_TABLE_TAG: (
+            pair_rows,
+            "No basket association analytics available.",
+            9,
+        ),
+    }
+
+
+_ANALYTICS_REFRESH_BUILDERS = {
+    "customer_aisle": _build_customer_aisle_analysis_payload,
+    "customer_attributes": _build_customer_attribute_analysis_payload,
+    "customer_product": _build_customer_product_analysis_payload,
+    "section_time": _build_section_time_analysis_payload,
+    "basket": _build_basket_analysis_payload,
+}
+
+
+def _apply_analytics_payload(
+    payload: dict[str, tuple[list[list[str]], str, int]],
+) -> None:
+    for table_tag, (rows, empty_message, column_count) in payload.items():
+        _populate_table_rows(table_tag, rows, empty_message, column_count)
+
+
+def _update_analytics_refresh_state(key: str, progress: float, status: str) -> None:
+    with _ANALYTICS_REFRESH_LOCK:
+        state = _ANALYTICS_REFRESH_STATES[key]
+        state["progress"] = max(0.0, min(progress, 1.0))
+        state["status"] = status
+
+
+def _set_analytics_refresh_loaded(key: str, status: str | None = None) -> None:
+    with _ANALYTICS_REFRESH_LOCK:
+        state = _ANALYTICS_REFRESH_STATES[key]
+        state["thread"] = None
+        state["is_refreshing"] = False
+        state["progress"] = 1.0
+        state["status"] = status or _ANALYTICS_REFRESH_CONFIG[key]["complete_status"]
+        state["completed"] = False
+        state["applied"] = True
+        state["has_loaded"] = True
+        state["payload"] = None
+
+
+def _run_analytics_refresh(key: str) -> None:
+    try:
+        payload = _ANALYTICS_REFRESH_BUILDERS[key](
+            progress_callback=lambda progress, status: _update_analytics_refresh_state(
+                key, progress, status
+            )
+        )
+        with _ANALYTICS_REFRESH_LOCK:
+            state = _ANALYTICS_REFRESH_STATES[key]
+            state["payload"] = payload
+            state["progress"] = 1.0
+            state["status"] = _ANALYTICS_REFRESH_CONFIG[key]["complete_status"]
+            state["completed"] = True
+            state["applied"] = False
+            state["is_refreshing"] = False
+            state["thread"] = None
+    except Exception as exc:
+        with _ANALYTICS_REFRESH_LOCK:
+            state = _ANALYTICS_REFRESH_STATES[key]
+            state["payload"] = None
+            state["progress"] = 0.0
+            state["status"] = f"Refresh failed: {exc}"
+            state["completed"] = True
+            state["applied"] = True
+            state["is_refreshing"] = False
+            state["thread"] = None
+
+
+def _poll_analytics_refresh_state(key: str) -> None:
+    config = _ANALYTICS_REFRESH_CONFIG[key]
+    with _ANALYTICS_REFRESH_LOCK:
+        state = _ANALYTICS_REFRESH_STATES[key]
+        progress = float(state["progress"])
+        status = str(state["status"])
+        is_refreshing = bool(state["is_refreshing"])
+        completed = bool(state["completed"])
+        applied = bool(state["applied"])
+        payload = state["payload"]
+
+    if dpg.does_item_exist(config["button_tag"]):
+        dpg.configure_item(config["button_tag"], enabled=not is_refreshing)
+    if dpg.does_item_exist(config["progress_tag"]):
+        dpg.set_value(config["progress_tag"], progress)
+        dpg.configure_item(
+            config["progress_tag"],
+            overlay=f"{progress * 100:.0f}%",
+        )
+    if dpg.does_item_exist(config["status_tag"]):
+        dpg.set_value(config["status_tag"], status)
+
+    if completed and not applied and payload is not None:
+        _apply_analytics_payload(payload)
+        with _ANALYTICS_REFRESH_LOCK:
+            state = _ANALYTICS_REFRESH_STATES[key]
+            state["completed"] = False
+            state["applied"] = True
+            state["has_loaded"] = True
+            state["payload"] = None
+
+
+def _start_analytics_refresh(key: str) -> None:
+    with _ANALYTICS_REFRESH_LOCK:
+        state = _ANALYTICS_REFRESH_STATES[key]
+        if state["is_refreshing"]:
+            return
+        state["thread"] = None
+        state["is_refreshing"] = True
+        state["progress"] = 0.0
+        state["status"] = "Starting analytics refresh..."
+        state["completed"] = False
+        state["applied"] = False
+        state["payload"] = None
+
+    thread = threading.Thread(target=_run_analytics_refresh, args=(key,), daemon=True)
+    with _ANALYTICS_REFRESH_LOCK:
+        _ANALYTICS_REFRESH_STATES[key]["thread"] = thread
+
+    thread.start()
+    _poll_analytics_refresh_state(key)
+
+
+def _refresh_analytics_payload_sync(key: str) -> None:
+    _apply_analytics_payload(_ANALYTICS_REFRESH_BUILDERS[key]())
+    _set_analytics_refresh_loaded(key)
+    _poll_analytics_refresh_state(key)
+
+
+def _get_selected_analytics_refresh_key() -> str:
+    if not dpg.does_item_exist(ANALYTICS_DATA_TAB_BAR_TAG):
+        return "customer_aisle"
+
+    selected_tab = dpg.get_value(ANALYTICS_DATA_TAB_BAR_TAG)
+    for key, config in _ANALYTICS_REFRESH_CONFIG.items():
+        if config["tab_tag"] == selected_tab:
+            return key
+    return "customer_aisle"
+
+
+def _analytics_table_has_rows(table_tag: str) -> bool:
+    return bool(
+        dpg.does_item_exist(table_tag)
+        and (dpg.get_item_children(table_tag, 1) or [])
+    )
+
+
+def _ensure_selected_analytics_subtab_loaded() -> None:
+    key = _get_selected_analytics_refresh_key()
+    config = _ANALYTICS_REFRESH_CONFIG[key]
+    with _ANALYTICS_REFRESH_LOCK:
+        state = _ANALYTICS_REFRESH_STATES[key]
+        has_loaded = bool(state["has_loaded"])
+        is_refreshing = bool(state["is_refreshing"])
+
+    if not has_loaded or not _analytics_table_has_rows(config["table_tag"]):
+        if not is_refreshing:
+            _start_analytics_refresh(key)
 
 
 def _format_bytes(num_bytes: int) -> str:
@@ -730,42 +1280,8 @@ def refresh_analytics_data_tables() -> None:
     if not dpg.does_item_exist(CUSTOMER_AISLE_GENDER_TABLE_TAG):
         return
 
-    _populate_table_rows(
-        CUSTOMER_AISLE_GENDER_TABLE_TAG,
-        _load_mapping_rows(customerAisleAnalytics.get_product_category_most_common_gender),
-        "No aisle gender analytics available.",
-        2,
-    )
-    _populate_table_rows(
-        CUSTOMER_AISLE_AGE_TABLE_TAG,
-        _load_mapping_rows(customerAisleAnalytics.get_product_category_most_common_age),
-        "No aisle age analytics available.",
-        2,
-    )
-    _populate_table_rows(
-        CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
-        _load_mapping_rows(customerProductAnalytics.get_product_most_common_gender),
-        "No product gender analytics available.",
-        2,
-    )
-    _populate_table_rows(
-        CUSTOMER_PRODUCT_AGE_TABLE_TAG,
-        _load_mapping_rows(customerProductAnalytics.get_product_most_common_age),
-        "No product age analytics available.",
-        2,
-    )
-    _populate_table_rows(
-        CUSTOMER_ATTRIBUTES_TABLE_TAG,
-        _load_customer_attribute_estimator_rows(),
-        "No estimator labels available.",
-        2,
-    )
-    _populate_table_rows(
-        SECTION_TIME_TABLE_TAG,
-        _load_section_time_analysis_rows(),
-        "No section time analytics available.",
-        7,
-    )
+    for key in _ANALYTICS_REFRESH_CONFIG:
+        _refresh_analytics_payload_sync(key)
 
 
 def refresh_simulation_info_tables() -> None:
@@ -788,7 +1304,8 @@ def refresh_simulation_info_tables() -> None:
 
 
 def callback_refresh_analytics_data(sender, app_data, user_data):
-    refresh_analytics_data_tables()
+    key = str(user_data) if user_data else _get_selected_analytics_refresh_key()
+    _start_analytics_refresh(key)
 
 
 def callback_refresh_simulation_info(sender, app_data, user_data):
@@ -876,6 +1393,11 @@ def callback_jump_simulation_video_frame(sender, app_data, user_data):
     _set_simulation_playback_button_state()
 
 
+def pump_analytics_view() -> None:
+    for key in _ANALYTICS_REFRESH_CONFIG:
+        _poll_analytics_refresh_state(key)
+
+
 def pump_simulation_view() -> None:
     with _SIMULATION_RENDER_LOCK:
         is_rendering = _SIMULATION_RENDER_STATE["is_rendering"]
@@ -892,89 +1414,217 @@ def pump_simulation_view() -> None:
 def callback_graph_view_changed(sender, app_data, user_data):
     selected_tab = dpg.get_value(GRAPH_VIEW_TAB_BAR_TAG)
     if selected_tab == GRAPH_ANALYTICS_TAB_TAG:
-        refresh_analytics_data_tables()
+        _ensure_selected_analytics_subtab_loaded()
     elif selected_tab == GRAPH_SIMULATION_TAB_TAG:
         refresh_simulation_info_tables()
         if not _SIMULATION_RENDER_STATE["is_rendering"]:
             _display_simulation_video_first_frame()
 
 
+def callback_analytics_subtab_changed(sender, app_data, user_data):
+    _ensure_selected_analytics_subtab_loaded()
+
+
+def _create_analytics_refresh_controls(
+    button_tag: str,
+    progress_tag: str,
+    status_tag: str,
+    button_label: str,
+    refresh_key: str,
+    helper_text: str,
+) -> None:
+    with dpg.group(horizontal=True):
+        dpg.add_button(
+            label=button_label,
+            tag=button_tag,
+            callback=callback_refresh_analytics_data,
+            user_data=refresh_key,
+        )
+        dpg.add_text(helper_text)
+    dpg.add_progress_bar(
+        default_value=0.0,
+        overlay="0%",
+        width=-1,
+        tag=progress_tag,
+    )
+    dpg.add_text(
+        _ANALYTICS_REFRESH_CONFIG[refresh_key]["ready_status"],
+        tag=status_tag,
+    )
+
+
 def create_analytics_data_view(parent: str) -> None:
     with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
-        with dpg.group(horizontal=True):
-            dpg.add_button(
-                label="Refresh Analytics Data",
-                callback=callback_refresh_analytics_data,
-            )
-            dpg.add_text(
-                "Use the tabs above to switch between the chart and live analytics data."
-            )
+        dpg.add_text(
+            "Use the subtabs below to inspect each analysis independently."
+        )
+        with dpg.tab_bar(
+            tag=ANALYTICS_DATA_TAB_BAR_TAG,
+            callback=callback_analytics_subtab_changed,
+        ):
+            with dpg.tab(
+                label="customerAisleAnalytics.py",
+                tag=ANALYTICS_CUSTOMER_AISLE_TAB_TAG,
+            ):
+                _create_analytics_refresh_controls(
+                    CUSTOMER_AISLE_REFRESH_BUTTON_TAG,
+                    CUSTOMER_AISLE_PROGRESS_TAG,
+                    CUSTOMER_AISLE_STATUS_TAG,
+                    "Refresh customerAisleAnalytics.py",
+                    "customer_aisle",
+                    "Refresh this analysis without reloading the others.",
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Most common customer gender by aisle")
+                _add_stretch_table(
+                    CUSTOMER_AISLE_GENDER_TABLE_TAG,
+                    ["Aisle ID", "Most Common Gender"],
+                    ANALYTICS_CUSTOMER_AISLE_TAB_TAG,
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Most common customer age by aisle")
+                _add_stretch_table(
+                    CUSTOMER_AISLE_AGE_TABLE_TAG,
+                    ["Aisle ID", "Most Common Age"],
+                    ANALYTICS_CUSTOMER_AISLE_TAB_TAG,
+                )
 
-        with dpg.collapsing_header(
-            label="customerAisleAnalytics.py",
-            default_open=True,
-        ) as aisle_header:
-            dpg.add_text("Most common customer gender by aisle")
-            _add_stretch_table(
-                CUSTOMER_AISLE_GENDER_TABLE_TAG,
-                ["Aisle ID", "Most Common Gender"],
-                aisle_header,
-            )
-            dpg.add_spacer(height=6)
-            dpg.add_text("Most common customer age by aisle")
-            _add_stretch_table(
-                CUSTOMER_AISLE_AGE_TABLE_TAG,
-                ["Aisle ID", "Most Common Age"],
-                aisle_header,
-            )
+            with dpg.tab(
+                label="customerAttributesEstimator.py",
+                tag=ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG,
+            ):
+                _create_analytics_refresh_controls(
+                    CUSTOMER_ATTRIBUTES_REFRESH_BUTTON_TAG,
+                    CUSTOMER_ATTRIBUTES_PROGRESS_TAG,
+                    CUSTOMER_ATTRIBUTES_STATUS_TAG,
+                    "Refresh customerAttributesEstimator.py",
+                    "customer_attributes",
+                    "Reload the estimator labels defined in the module.",
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Estimator label sets declared in the module")
+                _add_stretch_table(
+                    CUSTOMER_ATTRIBUTES_TABLE_TAG,
+                    ["Label Type", "Value"],
+                    ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG,
+                )
 
-        with dpg.collapsing_header(
-            label="customerAttributesEstimator.py",
-            default_open=True,
-        ) as estimator_header:
-            dpg.add_text("Estimator label sets declared in the module")
-            _add_stretch_table(
-                CUSTOMER_ATTRIBUTES_TABLE_TAG,
-                ["Label Type", "Value"],
-                estimator_header,
-            )
+            with dpg.tab(
+                label="customerProductAnalytics.py",
+                tag=ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
+            ):
+                _create_analytics_refresh_controls(
+                    CUSTOMER_PRODUCT_REFRESH_BUTTON_TAG,
+                    CUSTOMER_PRODUCT_PROGRESS_TAG,
+                    CUSTOMER_PRODUCT_STATUS_TAG,
+                    "Refresh customerProductAnalytics.py",
+                    "customer_product",
+                    "Refresh this product-level analysis only.",
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Most common customer gender by product")
+                _add_stretch_table(
+                    CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
+                    ["Product", "Most Common Gender"],
+                    ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Most common customer age by product")
+                _add_stretch_table(
+                    CUSTOMER_PRODUCT_AGE_TABLE_TAG,
+                    ["Product", "Most Common Age"],
+                    ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
+                )
 
-        with dpg.collapsing_header(
-            label="customerProductAnalytics.py",
-            default_open=True,
-        ) as product_header:
-            dpg.add_text("Most common customer gender by product")
-            _add_stretch_table(
-                CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
-                ["Product", "Most Common Gender"],
-                product_header,
-            )
-            dpg.add_spacer(height=6)
-            dpg.add_text("Most common customer age by product")
-            _add_stretch_table(
-                CUSTOMER_PRODUCT_AGE_TABLE_TAG,
-                ["Product", "Most Common Age"],
-                product_header,
-            )
+            with dpg.tab(
+                label="sectionTimeAnalysis.py",
+                tag=ANALYTICS_SECTION_TIME_TAB_TAG,
+            ):
+                _create_analytics_refresh_controls(
+                    SECTION_TIME_REFRESH_BUTTON_TAG,
+                    SECTION_TIME_PROGRESS_TAG,
+                    SECTION_TIME_STATUS_TAG,
+                    "Refresh sectionTimeAnalysis.py",
+                    "section_time",
+                    "This can take a while because it walks each store's paths.",
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Section time summaries across all stores")
+                _add_stretch_table(
+                    SECTION_TIME_TABLE_TAG,
+                    [
+                        "Store ID",
+                        "Store",
+                        "Aisle ID",
+                        "Section",
+                        "Total Seconds",
+                        "Average Seconds",
+                        "Customers",
+                    ],
+                    ANALYTICS_SECTION_TIME_TAB_TAG,
+                )
 
-        with dpg.collapsing_header(
-            label="sectionTimeAnalysis.py",
-            default_open=True,
-        ) as section_header:
-            dpg.add_text("Section time summaries across all stores")
-            _add_stretch_table(
-                SECTION_TIME_TABLE_TAG,
-                [
-                    "Store ID",
-                    "Store",
-                    "Aisle ID",
-                    "Section",
-                    "Total Seconds",
-                    "Average Seconds",
-                    "Customers",
-                ],
-                section_header,
-            )
+            with dpg.tab(
+                label="basketAnalysis.py",
+                tag=ANALYTICS_BASKET_TAB_TAG,
+            ):
+                _create_analytics_refresh_controls(
+                    BASKET_REFRESH_BUTTON_TAG,
+                    BASKET_PROGRESS_TAG,
+                    BASKET_STATUS_TAG,
+                    "Refresh basketAnalysis.py",
+                    "basket",
+                    "Refresh basket metrics and association rules.",
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Basket summary metrics across all stores")
+                _add_stretch_table(
+                    BASKET_SUMMARY_TABLE_TAG,
+                    [
+                        "Store ID",
+                        "Store",
+                        "Transactions",
+                        "Revenue",
+                        "Avg Basket Size",
+                        "Avg Quantity",
+                        "Avg Value",
+                    ],
+                    ANALYTICS_BASKET_TAB_TAG,
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Per-product basket analysis")
+                _add_stretch_table(
+                    BASKET_PRODUCTS_TABLE_TAG,
+                    [
+                        "Store ID",
+                        "Store",
+                        "Product",
+                        "Quantity Sold",
+                        "Transactions",
+                        "Revenue",
+                    ],
+                    ANALYTICS_BASKET_TAB_TAG,
+                )
+                dpg.add_spacer(height=6)
+                dpg.add_text("Product-pair association rules")
+                _add_stretch_table(
+                    BASKET_PAIRS_TABLE_TAG,
+                    [
+                        "Store ID",
+                        "Store",
+                        "Product A",
+                        "Product B",
+                        "Co-Occurrences",
+                        "Support",
+                        "Confidence A->B",
+                        "Confidence B->A",
+                        "Lift",
+                    ],
+                    ANALYTICS_BASKET_TAB_TAG,
+                )
+
+        for key in _ANALYTICS_REFRESH_CONFIG:
+            _poll_analytics_refresh_state(key)
 
 
 def create_simulation_view(parent: str) -> None:
