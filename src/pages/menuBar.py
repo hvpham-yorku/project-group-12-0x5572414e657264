@@ -1,10 +1,8 @@
 import dearpygui.dearpygui as dpg
-import shutil
 from src.themes.themes import *
 from src.pages import logWindow
 from src.pages import cameraMergeWindow
 from src.logic import singleton
-from src.actions import videoImportDialog
 from src.pages import cameraZoneWindow
 from src.pages import addStorePopup
 from src.pages import wipeDatabasePopup
@@ -15,6 +13,15 @@ from tkinter import filedialog
 import platform
 import subprocess
 import webbrowser
+from src.logic.dataGenerator import (
+    generate_and_persist,
+    import_sales_data_from_csv_dir,
+)
+from src.pages.dataAnalyticsWindow import (
+    GRAPH_PIE_TAB_TAG,
+    GRAPH_VIEW_TAB_BAR_TAG,
+    populateDropDowns,
+)
 
 SINGLETON = singleton.Singleton()
 
@@ -54,6 +61,81 @@ def openAddStorePopup(sender, app_data, user_data):
 
 def openWipeDatabasePopup(sender, app_data, user_data):
     wipeDatabasePopup.open_wipe_database_popup()
+
+
+def _refresh_data_analysis_window() -> None:
+    if not dpg.does_item_exist("countsSelector"):
+        return
+    if not dpg.does_item_exist("categorySelector"):
+        return
+
+    populateDropDowns()
+
+    if dpg.does_item_exist("chart_type_dropdown"):
+        dpg.set_value("chart_type_dropdown", "Select Chart Type")
+    if dpg.does_item_exist("graphPie"):
+        dpg.configure_item("graphPie", show=False)
+    if dpg.does_item_exist("graphBar"):
+        dpg.configure_item("graphBar", show=False)
+    if dpg.does_item_exist(GRAPH_VIEW_TAB_BAR_TAG):
+        dpg.set_value(GRAPH_VIEW_TAB_BAR_TAG, GRAPH_PIE_TAB_TAG)
+
+
+def callback_populateDataBaseWithDemoData(sender, app_data, user_data):
+    generate_and_persist(include_sales_data=True)
+    _refresh_data_analysis_window()
+
+
+def callback_populateDataBaseWithDemoDataNoSales(sender, app_data, user_data):
+    generate_and_persist(include_sales_data=False)
+    _refresh_data_analysis_window()
+
+
+def _select_csv_import_directory() -> str | None:
+    prompt = "Select the folder containing products.csv, checkouts.csv, and purchases.csv:"
+    default_dir = os.path.abspath("generated_data")
+
+    if platform.system() == "Darwin":
+        script = f'POSIX path of (choose folder with prompt "{prompt}")'
+        result = subprocess.run(
+            ["osascript", "-e", script], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip() or None
+
+    root = tk.Tk()
+    root.withdraw()
+    root.wm_attributes("-topmost", 1)
+    try:
+        selected_dir = filedialog.askdirectory(
+            title="Select generated sales CSV folder",
+            initialdir=default_dir if os.path.isdir(default_dir) else os.getcwd(),
+        )
+    finally:
+        root.destroy()
+
+    return selected_dir or None
+
+
+def callback_import_generated_sales_csvs(sender, app_data, user_data):
+    csv_dir = _select_csv_import_directory()
+    if not csv_dir:
+        logWindow.addLog(0, "Sales CSV import cancelled.")
+        return
+
+    try:
+        results = import_sales_data_from_csv_dir(csv_dir)
+        _refresh_data_analysis_window()
+        logWindow.addLog(
+            0,
+            "Imported sales CSVs successfully from "
+            f"{csv_dir}: {results['product_count']} products, "
+            f"{results['checkout_count']} checkouts, "
+            f"{results['purchase_count']} purchases.",
+        )
+    except Exception as exc:
+        logWindow.addLog(2, f"Sales CSV import failed for {csv_dir}: {exc}")
 
 
 def delete_orphaned_database_videos(sender, app_data, user_data):
@@ -116,6 +198,14 @@ def menuBar():
 
             with dpg.menu(label="Settings"):
                 dpg.add_menu_item(label="DATABASE WIPE", callback=openWipeDatabasePopup)
+                dpg.add_menu_item(
+                    label="Add demo data to database",
+                    callback=callback_populateDataBaseWithDemoData,
+                )
+                dpg.add_menu_item(
+                    label="Add demo data to database no sales",
+                    callback=callback_populateDataBaseWithDemoDataNoSales,
+                )
                 # dpg.add_menu_item(label="Setting 1", callback=feature_not_implemented, check=True)
                 # dpg.add_menu_item(label="Setting 2", callback=feature_not_implemented)
         with dpg.menu(label="Data"):
@@ -124,6 +214,10 @@ def menuBar():
             )
             dpg.add_menu_item(label="Create aisles for store", callback=openZoneWindow)
             dpg.add_menu_item(label="Add store", callback=openAddStorePopup)
+            dpg.add_menu_item(
+                label="Import generated sales CSVs",
+                callback=callback_import_generated_sales_csvs,
+            )
 
         with dpg.menu(label="View"):
             with dpg.menu(label="Themes"):

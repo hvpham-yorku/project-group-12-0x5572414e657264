@@ -29,7 +29,13 @@ import random
 from datetime import datetime, timedelta
 
 from src.database.models import (
-    Store, Aisle, Product, Customer, Checkout, Purchase, Path,
+    Store,
+    Aisle,
+    Product,
+    Customer,
+    Checkout,
+    Purchase,
+    Path,
 )
 from src.database.database_setup import (
     db,
@@ -270,31 +276,31 @@ AISLE_CATEGORIES = [
 # ──────────────────────────────────────────────────────────────
 
 HOURLY_ARRIVAL_WEIGHTS = {
-    7: 0.02,    # early-morning trickle
-    8: 0.05,    # morning opening
-    9: 0.08,    # morning rush
-    10: 0.06,   # mid-morning
-    11: 0.09,   # pre-lunch pickup
-    12: 0.12,   # lunch-rush peak
-    13: 0.08,   # post-lunch
-    14: 0.05,   # afternoon lull
-    15: 0.05,   # afternoon lull
-    16: 0.08,   # late-afternoon pickup
-    17: 0.12,   # evening-rush peak
-    18: 0.10,   # evening rush
-    19: 0.06,   # evening tapering
-    20: 0.03,   # late evening
-    21: 0.01,   # near closing
+    7: 0.02,  # early-morning trickle
+    8: 0.05,  # morning opening
+    9: 0.08,  # morning rush
+    10: 0.06,  # mid-morning
+    11: 0.09,  # pre-lunch pickup
+    12: 0.12,  # lunch-rush peak
+    13: 0.08,  # post-lunch
+    14: 0.05,  # afternoon lull
+    15: 0.05,  # afternoon lull
+    16: 0.08,  # late-afternoon pickup
+    17: 0.12,  # evening-rush peak
+    18: 0.10,  # evening rush
+    19: 0.06,  # evening tapering
+    20: 0.03,  # late evening
+    21: 0.01,  # near closing
 }
 
 # Common aisle-visiting patterns (0-based indices into the sorted
 # aisle list).  Used to make shopping baskets more realistic:
 # customers who buy bread often also buy dairy, etc.
 _AISLE_COMBOS = [
-    [0, 4],        # Bakery + Dairy
-    [2, 3],        # Snacks + Beverages
-    [0, 1, 4],     # Bakery + Canned Goods + Dairy
-    [1, 3],        # Canned Goods + Beverages
+    [0, 4],  # Bakery + Dairy
+    [2, 3],  # Snacks + Beverages
+    [0, 1, 4],  # Bakery + Canned Goods + Dairy
+    [1, 3],  # Canned Goods + Beverages
     [0, 2, 3, 4],  # Bakery + Snacks + Beverages + Dairy
 ]
 
@@ -325,8 +331,13 @@ def generate_store_and_aisles(store_id: int = 1) -> tuple[Store, list[Aisle]]:
     Returns:
         (Store, list[Aisle]) with sequential IDs starting from 1.
     """
-    store = Store(store_id=store_id, name="SimMart", owner="DataGen Corp",
-                  height=STORE_HEIGHT, width=STORE_WIDTH)
+    store = Store(
+        store_id=store_id,
+        name="SimMart",
+        owner="DataGen Corp",
+        height=STORE_HEIGHT,
+        width=STORE_WIDTH,
+    )
 
     aisles: list[Aisle] = []
     for i in range(NUM_AISLES):
@@ -364,9 +375,7 @@ def generate_products(store_id: int, aisles: list[Aisle]) -> list[Product]:
         list[Product] with sequential product_ids starting from 1.
     """
     if len(aisles) != len(AISLE_CATEGORIES):
-        raise ValueError(
-            f"Expected {len(AISLE_CATEGORIES)} aisles, got {len(aisles)}"
-        )
+        raise ValueError(f"Expected {len(AISLE_CATEGORIES)} aisles, got {len(aisles)}")
 
     products: list[Product] = []
     product_id = 1
@@ -416,9 +425,7 @@ def generate_customers(
                        to today.
     """
     if base_date is None:
-        base_date = datetime.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        base_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     hours = list(HOURLY_ARRIVAL_WEIGHTS.keys())
     weights = list(HOURLY_ARRIVAL_WEIGHTS.values())
@@ -518,9 +525,7 @@ def generate_checkouts_and_purchases(
     purchase_id = 1
 
     for customer in checkout_customers:
-        duration_min = (
-            customer.exited_at - customer.entered_at
-        ).total_seconds() / 60.0
+        duration_min = (customer.exited_at - customer.entered_at).total_seconds() / 60.0
 
         num_items, num_aisles = _basket_params(duration_min)
         num_aisles = min(num_aisles, len(aisle_ids))
@@ -535,9 +540,7 @@ def generate_checkouts_and_purchases(
             qty = random.choices([1, 2, 3], weights=[0.80, 0.15, 0.05])[0]
             purchase_items.append((product, qty))
 
-        total_price = round(
-            sum(p.price * q for p, q in purchase_items), 2
-        )
+        total_price = round(sum(p.price * q for p, q in purchase_items), 2)
 
         buffer_min = random.uniform(1.0, 3.0)
         checkout_time = customer.exited_at - timedelta(minutes=buffer_min)
@@ -710,32 +713,38 @@ def generate_paths(
             checkout_x = random.choice(CHECKOUT_X_POSITIONS)
 
             waypoints = _build_shopper_route(
-                bought, aisle_by_id, max_order_per_aisle, checkout_x,
+                bought,
+                aisle_by_id,
+                max_order_per_aisle,
+                checkout_x,
             )
 
             co_idx = next(
-                i for i, (_, _, wt) in enumerate(waypoints)
-                if wt == "checkout"
+                i for i, (_, _, wt) in enumerate(waypoints) if wt == "checkout"
             )
             shop_wps = waypoints[: co_idx + 1]
             shop_secs = (co.created_at - customer.entered_at).total_seconds()
             timed_shop = _distribute_time(
-                shop_wps, customer.entered_at, shop_secs,
+                shop_wps,
+                customer.entered_at,
+                shop_secs,
             )
 
             exit_secs = (customer.exited_at - co.created_at).total_seconds()
             timed_exit = _build_exit_timed(
-                checkout_x, co.created_at, exit_secs,
+                checkout_x,
+                co.created_at,
+                exit_secs,
             )
 
             timed = timed_shop + timed_exit[1:]
         else:
             waypoints = _build_browser_route(aisles)
-            total_secs = (
-                customer.exited_at - customer.entered_at
-            ).total_seconds()
+            total_secs = (customer.exited_at - customer.entered_at).total_seconds()
             timed = _distribute_time(
-                waypoints, customer.entered_at, total_secs,
+                waypoints,
+                customer.entered_at,
+                total_secs,
             )
 
         sampled = _interpolate(timed, recording_interval)
@@ -942,10 +951,7 @@ def _interpolate(
     t = start_time
 
     while t <= end_time:
-        while (
-            seg < len(timed_waypoints) - 2
-            and timed_waypoints[seg + 1][2] < t
-        ):
+        while seg < len(timed_waypoints) - 2 and timed_waypoints[seg + 1][2] < t:
             seg += 1
 
         x1, y1, t1 = timed_waypoints[seg]
@@ -1016,6 +1022,289 @@ def _write_to_csv(filepath: str, items: list, fieldnames: list[str]) -> None:
             writer.writerow({f: getattr(item, f) for f in fieldnames})
 
 
+_SALES_CSV_SPECS = {
+    "product": {
+        "filename": "products.csv",
+        "fieldnames": ["product_id", "store_id", "aisle_id", "name", "price", "order"],
+        "id_field": "product_id",
+        "table": ProductTable,
+        "converters": {
+            "product_id": int,
+            "store_id": int,
+            "aisle_id": int,
+            "name": str,
+            "price": float,
+            "order": int,
+        },
+    },
+    "checkout": {
+        "filename": "checkouts.csv",
+        "fieldnames": [
+            "checkout_id",
+            "store_id",
+            "customer_id",
+            "total_price",
+            "created_at",
+        ],
+        "id_field": "checkout_id",
+        "table": CheckoutTable,
+        "converters": {
+            "checkout_id": int,
+            "store_id": int,
+            "customer_id": int,
+            "total_price": float,
+            "created_at": "datetime",
+        },
+    },
+    "purchase": {
+        "filename": "purchases.csv",
+        "fieldnames": ["purchase_id", "product_id", "checkout_id", "quantity"],
+        "id_field": "purchase_id",
+        "table": PurchaseTable,
+        "converters": {
+            "purchase_id": int,
+            "product_id": int,
+            "checkout_id": int,
+            "quantity": int,
+        },
+    },
+}
+
+
+def _convert_csv_value(
+    raw_value,
+    converter,
+    *,
+    field_name: str,
+    file_name: str,
+    line_number: int,
+):
+    value = raw_value.strip() if isinstance(raw_value, str) else raw_value
+
+    if converter is str:
+        return "" if value is None else str(value)
+
+    if value in (None, ""):
+        raise ValueError(
+            f"{file_name} line {line_number}: missing value for '{field_name}'"
+        )
+
+    try:
+        if converter is int:
+            return int(value)
+        if converter is float:
+            return float(value)
+        if converter == "datetime":
+            return datetime.fromisoformat(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{file_name} line {line_number}: invalid value for '{field_name}': {value!r}"
+        ) from exc
+
+    raise ValueError(f"Unsupported CSV converter for '{field_name}' in {file_name}")
+
+
+def _read_sales_csv(
+    filepath: str,
+    *,
+    fieldnames: list[str],
+    converters: dict[str, object],
+) -> list[dict]:
+    with open(filepath, "r", newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        actual_fields = reader.fieldnames or []
+        missing_fields = [field for field in fieldnames if field not in actual_fields]
+        extra_fields = [field for field in actual_fields if field not in fieldnames]
+        if missing_fields or extra_fields:
+            problems = []
+            if missing_fields:
+                problems.append(f"missing columns: {', '.join(missing_fields)}")
+            if extra_fields:
+                problems.append(f"unexpected columns: {', '.join(extra_fields)}")
+            raise ValueError(
+                f"{os.path.basename(filepath)} has invalid headers ({'; '.join(problems)})"
+            )
+
+        rows = []
+        for line_number, row in enumerate(reader, start=2):
+            parsed_row = {}
+            for field_name in fieldnames:
+                parsed_row[field_name] = _convert_csv_value(
+                    row.get(field_name),
+                    converters[field_name],
+                    field_name=field_name,
+                    file_name=os.path.basename(filepath),
+                    line_number=line_number,
+                )
+            rows.append(parsed_row)
+    return rows
+
+
+def _get_existing_ids(table_cls, id_field: str) -> set[int]:
+    return {
+        getattr(row, id_field)
+        for row in table_cls.select(getattr(table_cls, id_field))
+    }
+
+
+def _find_duplicate_ids(rows: list[dict], id_field: str) -> list[int]:
+    seen = set()
+    duplicates = set()
+    for row in rows:
+        row_id = row[id_field]
+        if row_id in seen:
+            duplicates.add(row_id)
+        else:
+            seen.add(row_id)
+    return sorted(duplicates)
+
+
+def _format_ids(ids: list[int] | set[int], limit: int = 5) -> str:
+    values = sorted(ids)
+    preview = ", ".join(str(value) for value in values[:limit])
+    if len(values) > limit:
+        preview += ", ..."
+    return preview
+
+
+def _validate_sales_import_rows(
+    product_rows: list[dict],
+    checkout_rows: list[dict],
+    purchase_rows: list[dict],
+) -> None:
+    rows_by_type = {
+        "product": product_rows,
+        "checkout": checkout_rows,
+        "purchase": purchase_rows,
+    }
+
+    for row_type, rows in rows_by_type.items():
+        spec = _SALES_CSV_SPECS[row_type]
+        id_field = spec["id_field"]
+        duplicate_ids = _find_duplicate_ids(rows, id_field)
+        if duplicate_ids:
+            raise ValueError(
+                f"Duplicate {row_type} IDs in {spec['filename']}: {_format_ids(duplicate_ids)}"
+            )
+
+        existing_ids = _get_existing_ids(spec["table"], id_field)
+        conflicting_ids = {
+            row[id_field] for row in rows if row[id_field] in existing_ids
+        }
+        if conflicting_ids:
+            raise ValueError(
+                f"{spec['filename']} contains IDs already in the database: "
+                f"{_format_ids(conflicting_ids)}"
+            )
+
+    store_ids = _get_existing_ids(StoreTable, "store_id")
+    aisle_ids = _get_existing_ids(AisleTable, "aisle_id")
+    customer_ids = _get_existing_ids(CustomerTable, "customer_id")
+
+    missing_product_store_ids = {
+        row["store_id"] for row in product_rows if row["store_id"] not in store_ids
+    }
+    if missing_product_store_ids:
+        raise ValueError(
+            "products.csv references store IDs that are not in the database: "
+            f"{_format_ids(missing_product_store_ids)}"
+        )
+
+    missing_aisle_ids = {
+        row["aisle_id"] for row in product_rows if row["aisle_id"] not in aisle_ids
+    }
+    if missing_aisle_ids:
+        raise ValueError(
+            "products.csv references aisle IDs that are not in the database: "
+            f"{_format_ids(missing_aisle_ids)}"
+        )
+
+    missing_checkout_store_ids = {
+        row["store_id"] for row in checkout_rows if row["store_id"] not in store_ids
+    }
+    if missing_checkout_store_ids:
+        raise ValueError(
+            "checkouts.csv references store IDs that are not in the database: "
+            f"{_format_ids(missing_checkout_store_ids)}"
+        )
+
+    missing_customer_ids = {
+        row["customer_id"]
+        for row in checkout_rows
+        if row["customer_id"] not in customer_ids
+    }
+    if missing_customer_ids:
+        raise ValueError(
+            "checkouts.csv references customer IDs that are not in the database: "
+            f"{_format_ids(missing_customer_ids)}"
+        )
+
+    imported_product_ids = {row["product_id"] for row in product_rows}
+    imported_checkout_ids = {row["checkout_id"] for row in checkout_rows}
+
+    missing_purchase_product_ids = {
+        row["product_id"]
+        for row in purchase_rows
+        if row["product_id"] not in imported_product_ids
+    }
+    if missing_purchase_product_ids:
+        raise ValueError(
+            "purchases.csv references product IDs missing from products.csv: "
+            f"{_format_ids(missing_purchase_product_ids)}"
+        )
+
+    missing_purchase_checkout_ids = {
+        row["checkout_id"]
+        for row in purchase_rows
+        if row["checkout_id"] not in imported_checkout_ids
+    }
+    if missing_purchase_checkout_ids:
+        raise ValueError(
+            "purchases.csv references checkout IDs missing from checkouts.csv: "
+            f"{_format_ids(missing_purchase_checkout_ids)}"
+        )
+
+
+def import_sales_data_from_csv_dir(csv_dir: str) -> dict[str, int]:
+    """Import generated sales CSV files into the database.
+
+    The folder must contain the three exports created by
+    ``generate_and_persist(include_sales_data=False)``:
+    ``products.csv``, ``checkouts.csv``, and ``purchases.csv``.
+    """
+    csv_dir = os.path.abspath(csv_dir)
+    if not os.path.isdir(csv_dir):
+        raise FileNotFoundError(f"CSV directory not found: {csv_dir}")
+
+    rows_by_type: dict[str, list[dict]] = {}
+    for row_type, spec in _SALES_CSV_SPECS.items():
+        filepath = os.path.join(csv_dir, spec["filename"])
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f"Required CSV file not found: {filepath}")
+        rows_by_type[row_type] = _read_sales_csv(
+            filepath,
+            fieldnames=spec["fieldnames"],
+            converters=spec["converters"],
+        )
+
+    _validate_sales_import_rows(
+        rows_by_type["product"],
+        rows_by_type["checkout"],
+        rows_by_type["purchase"],
+    )
+
+    with db.atomic():
+        _bulk_insert(ProductTable, rows_by_type["product"])
+        _bulk_insert(CheckoutTable, rows_by_type["checkout"])
+        _bulk_insert(PurchaseTable, rows_by_type["purchase"])
+
+    return {
+        "product_count": len(rows_by_type["product"]),
+        "checkout_count": len(rows_by_type["checkout"]),
+        "purchase_count": len(rows_by_type["purchase"]),
+    }
+
+
 def generate_and_persist(
     store_id: int = 1,
     num_customers: int = 1000,
@@ -1061,95 +1350,118 @@ def generate_and_persist(
     products = generate_products(store_id, aisles)
     customers = generate_customers(store_id, num_customers, base_date)
     checkouts, purchases = generate_checkouts_and_purchases(
-        store_id, customers, products,
+        store_id,
+        customers,
+        products,
     )
     paths = generate_paths(customers, checkouts, purchases, products, aisles)
 
     # --- always persisted to DB ---
 
-    _bulk_insert(StoreTable, [
-        {
-            "store_id": store.store_id,
-            "name": store.name,
-            "owner": store.owner,
-            "height": store.height,
-            "width": store.width,
-        },
-    ])
+    _bulk_insert(
+        StoreTable,
+        [
+            {
+                "store_id": store.store_id,
+                "name": store.name,
+                "owner": store.owner,
+                "height": store.height,
+                "width": store.width,
+            },
+        ],
+    )
 
-    _bulk_insert(AisleTable, [
-        {
-            "aisle_id": a.aisle_id,
-            "store_id": a.store_id,
-            "bottom_left_x": a.bottom_left_x,
-            "bottom_left_y": a.bottom_left_y,
-            "top_right_x": a.top_right_x,
-            "top_right_y": a.top_right_y,
-            "vertical": a.vertical,
-        }
-        for a in aisles
-    ])
+    _bulk_insert(
+        AisleTable,
+        [
+            {
+                "aisle_id": a.aisle_id,
+                "store_id": a.store_id,
+                "bottom_left_x": a.bottom_left_x,
+                "bottom_left_y": a.bottom_left_y,
+                "top_right_x": a.top_right_x,
+                "top_right_y": a.top_right_y,
+                "vertical": a.vertical,
+            }
+            for a in aisles
+        ],
+    )
 
-    _bulk_insert(CustomerTable, [
-        {
-            "customer_id": c.customer_id,
-            "entered_at": c.entered_at,
-            "exited_at": c.exited_at,
-            "store_id": c.store_id,
-            "age": c.age,
-            "sex": c.sex,
-        }
-        for c in customers
-    ])
+    _bulk_insert(
+        CustomerTable,
+        [
+            {
+                "customer_id": c.customer_id,
+                "entered_at": c.entered_at,
+                "exited_at": c.exited_at,
+                "store_id": c.store_id,
+                "age": c.age,
+                "sex": c.sex,
+            }
+            for c in customers
+        ],
+    )
 
-    _bulk_insert(PathTable, [
-        {
-            "path_id": p.path_id,
-            "customer_id": p.customer_id,
-            "timestamp": p.timestamp,
-            "location_x": p.location_x,
-            "location_y": p.location_y,
-        }
-        for p in paths
-    ])
+    _bulk_insert(
+        PathTable,
+        [
+            {
+                "path_id": p.path_id,
+                "customer_id": p.customer_id,
+                "timestamp": p.timestamp,
+                "location_x": p.location_x,
+                "location_y": p.location_y,
+            }
+            for p in paths
+        ],
+    )
 
     # --- sales data: DB or CSV ---
 
     csv_files: dict[str, str] = {}
 
     if include_sales_data:
-        _bulk_insert(ProductTable, [
-            {
-                "product_id": p.product_id,
-                "store_id": p.store_id,
-                "aisle_id": p.aisle_id,
-                "name": p.name,
-                "price": p.price,
-                "order": p.order,
-            }
-            for p in products
-        ])
+        _bulk_insert(
+            ProductTable,
+            [
+                {
+                    "product_id": p.product_id,
+                    "store_id": p.store_id,
+                    "aisle_id": p.aisle_id,
+                    "name": p.name,
+                    "price": p.price,
+                    "order": p.order,
+                }
+                for p in products
+            ],
+        )
 
-        _bulk_insert(CheckoutTable, [
-            {
-                "checkout_id": co.checkout_id,
-                "store_id": co.store_id,
-                "customer_id": co.customer_id,
-                "total_price": co.total_price,
-                "created_at": co.created_at,
-            }
-            for co in checkouts
-        ])
+        _bulk_insert(
+            CheckoutTable,
+            [
+                {
+                    "checkout_id": co.checkout_id,
+                    "store_id": co.store_id,
+                    "customer_id": co.customer_id,
+                    "total_price": co.total_price,
+                    "created_at": co.created_at,
+                }
+                for co in checkouts
+            ],
+        )
 
-        _bulk_insert(PurchaseTable, [
-            {
-                "purchase_id": pu.purchase_id,
-                "product_id": pu.product_id,
-                "checkout_id": pu.checkout_id,
-                "quantity": pu.quantity,
-            }
-            for pu in purchases
-        ])
+        _bulk_insert(
+            PurchaseTable,
+            [
+                {
+                    "purchase_id": pu.purchase_id,
+                    "product_id": pu.product_id,
+                    "checkout_id": pu.checkout_id,
+                    "quantity": pu.quantity,
+                }
+                for pu in purchases
+            ],
+        )
     else:
         product_csv = os.path.join(csv_dir, "products.csv")
         _write_to_csv(
@@ -1163,8 +1475,7 @@ def generate_and_persist(
         _write_to_csv(
             checkout_csv,
             checkouts,
-            ["checkout_id", "store_id", "customer_id",
-             "total_price", "created_at"],
+            ["checkout_id", "store_id", "customer_id", "total_price", "created_at"],
         )
         csv_files["checkout"] = checkout_csv
 

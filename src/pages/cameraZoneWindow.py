@@ -59,10 +59,10 @@ def _list_database_videos(store_id: int | None) -> list[str]:
 
 def _get_store_options() -> list[str]:
     stores = get_all_stores()
+    STORE_LABEL_TO_ID.clear()
     if not stores:
         return []
     options: list[str] = []
-    STORE_LABEL_TO_ID.clear()
     for store in stores:
         label = f"{store.store_id} - {store.name or 'Unnamed Store'}"
         options.append(label)
@@ -70,17 +70,31 @@ def _get_store_options() -> list[str]:
     return options
 
 
+def _clear_zone_editor_state() -> None:
+    global SELECTED_ZONE_INDEX
+    ZONES.clear()
+    SELECTED_ZONE_INDEX = 0
+    _refresh_zone_list()
+    _refresh_video_dropdown()
+    _update_preview()
+
+
 def refresh_store_dropdowns() -> None:
     store_options = _get_store_options()
     default_store = store_options[0] if store_options else ""
 
-    if dpg.does_item_exist(STORE_DROPDOWN_TAG):
-        current = dpg.get_value(STORE_DROPDOWN_TAG)
-        dpg.configure_item(STORE_DROPDOWN_TAG, items=store_options)
-        dpg.set_value(
-            STORE_DROPDOWN_TAG,
-            current if current in store_options else default_store,
-        )
+    if not dpg.does_item_exist(STORE_DROPDOWN_TAG):
+        return
+
+    current = dpg.get_value(STORE_DROPDOWN_TAG)
+    selected_store = current if current in store_options else default_store
+    dpg.configure_item(STORE_DROPDOWN_TAG, items=store_options)
+    dpg.set_value(STORE_DROPDOWN_TAG, selected_store)
+
+    if selected_store:
+        callback_load_zones(None, None, {"silent": True})
+    else:
+        _clear_zone_editor_state()
 
 
 def _get_selected_store_id() -> int | None:
@@ -132,6 +146,7 @@ def _refresh_zone_list() -> None:
     dpg.configure_item(ZONE_LIST_TAG, items=items)
 
     if not items:
+        dpg.set_value(ZONE_LIST_TAG, "")
         return
 
     global SELECTED_ZONE_INDEX
@@ -273,6 +288,7 @@ def callback_select_zone(sender, app_data, user_data):
 def callback_load_zones(sender, app_data, user_data):
     store_id = _get_selected_store_id()
     if store_id is None:
+        _clear_zone_editor_state()
         return
 
     aisles = get_aisles_by_store(store_id)
@@ -292,11 +308,11 @@ def callback_load_zones(sender, app_data, user_data):
     global SELECTED_ZONE_INDEX
     SELECTED_ZONE_INDEX = 0 if ZONES else 0
     _refresh_zone_list()
+    _refresh_video_dropdown()
     _update_preview()
     silent = isinstance(user_data, dict) and user_data.get("silent")
     if not silent:
         logWindow.addLog(0, f"Loaded {len(ZONES)} zones from store {store_id}.")
-    _refresh_video_dropdown()
 
 
 def callback_add_zone(sender, app_data, user_data):

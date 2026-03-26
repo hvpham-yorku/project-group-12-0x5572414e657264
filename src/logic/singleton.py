@@ -3,6 +3,9 @@ import os
 from pathlib import Path
 from src.pages import logWindow
 from src.utils.paths import get_data_path
+from src.logic.graphWindowData import GraphWindow
+import peewee as pw
+from src.database.database_setup import initialize_db, close_db
 
 
 # TODO later we can have the user adjust the move amount
@@ -21,16 +24,53 @@ class Singleton:
     _selectedVideos: dict  #: dict[str, dict[str, bool | List[int, int]]]
     _moveAmount: int
     _databaseVideoFolder: str
+    _graphWindowObj: GraphWindow
+    _database: pw.SqliteDatabase
+    _instance = None
 
-    def __init__(self):
-        self._tempFolder = get_data_path("videos")
-        self._tempFolderPictures = get_data_path("pictures")
-        self._databaseVideoFolder = get_data_path("databaseVideos")
-        os.makedirs(self._tempFolder, exist_ok=True)
-        os.makedirs(self._tempFolderPictures, exist_ok=True)
-        os.makedirs(self._databaseVideoFolder, exist_ok=True)
-        self._selectedVideos = {}
-        self._moveAmount = 50
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            # Create the instance if it doesn't exist
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self, value=None):
+        # 1. Check if the instance already has the '_initialized' flag
+        if not hasattr(self, "_initialized"):
+            # print("Running __init__ for the first time...")
+            self._tempFolder = get_data_path("videos")
+            self._tempFolderPictures = get_data_path("pictures")
+            self._databaseVideoFolder = get_data_path("databaseVideos")
+            os.makedirs(self._tempFolder, exist_ok=True)
+            os.makedirs(self._tempFolderPictures, exist_ok=True)
+            os.makedirs(self._databaseVideoFolder, exist_ok=True)
+            self._selectedVideos = {}
+            self._moveAmount = 50
+            self._graphWindowObj = GraphWindow()
+
+            # Put all your heavy setup, database connections, etc. here
+            self.value = value
+
+            # 2. Set the flag so this block is skipped next time
+            self._initialized = True
+        else:
+            pass
+            # print("__init__ was called again, but setup was bypassed.")
+
+    # def init_graphWindowObj(self) -> None:
+    #     self._graphWindowObj = GraphWindow()
+
+    # def init_databaseObj(self) -> None:
+    #     self._databse = initialize_db()
+
+    # def get_databaseObj(self) -> pw.SqliteDatabase:
+    #     return self._database
+
+    def reset_graphWindowObj(self) -> None:
+        self._graphWindowObj = GraphWindow()
+
+    def get_graphWindowObj(self) -> GraphWindow:
+        return self._graphWindowObj
 
     def get_tempFolder(self):
         return self._tempFolder
