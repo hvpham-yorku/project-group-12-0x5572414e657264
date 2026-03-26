@@ -33,6 +33,10 @@ ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG = "analytics_customer_attributes_tab"
 ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG = "analytics_customer_product_tab"
 ANALYTICS_SECTION_TIME_TAB_TAG = "analytics_section_time_tab"
 ANALYTICS_BASKET_TAB_TAG = "analytics_basket_tab"
+BASKET_ANALYSIS_TAB_BAR_TAG = "basket_analysis_tab_bar"
+BASKET_SUMMARY_TAB_TAG = "basket_summary_tab"
+BASKET_PRODUCTS_TAB_TAG = "basket_products_tab"
+BASKET_PAIRS_TAB_TAG = "basket_pairs_tab"
 
 CUSTOMER_AISLE_GENDER_TABLE_TAG = "customer_aisle_gender_table"
 CUSTOMER_AISLE_AGE_TABLE_TAG = "customer_aisle_age_table"
@@ -1577,51 +1581,55 @@ def create_analytics_data_view(parent: str) -> None:
                     "Refresh basket metrics and association rules.",
                 )
                 dpg.add_spacer(height=6)
-                dpg.add_text("Basket summary metrics across all stores")
-                _add_stretch_table(
-                    BASKET_SUMMARY_TABLE_TAG,
-                    [
-                        "Store ID",
-                        "Store",
-                        "Transactions",
-                        "Revenue",
-                        "Avg Basket Size",
-                        "Avg Quantity",
-                        "Avg Value",
-                    ],
-                    ANALYTICS_BASKET_TAB_TAG,
-                )
-                dpg.add_spacer(height=6)
-                dpg.add_text("Per-product basket analysis")
-                _add_stretch_table(
-                    BASKET_PRODUCTS_TABLE_TAG,
-                    [
-                        "Store ID",
-                        "Store",
-                        "Product",
-                        "Quantity Sold",
-                        "Transactions",
-                        "Revenue",
-                    ],
-                    ANALYTICS_BASKET_TAB_TAG,
-                )
-                dpg.add_spacer(height=6)
-                dpg.add_text("Product-pair association rules")
-                _add_stretch_table(
-                    BASKET_PAIRS_TABLE_TAG,
-                    [
-                        "Store ID",
-                        "Store",
-                        "Product A",
-                        "Product B",
-                        "Co-Occurrences",
-                        "Support",
-                        "Confidence A->B",
-                        "Confidence B->A",
-                        "Lift",
-                    ],
-                    ANALYTICS_BASKET_TAB_TAG,
-                )
+                with dpg.tab_bar(tag=BASKET_ANALYSIS_TAB_BAR_TAG):
+                    with dpg.tab(label="Summary", tag=BASKET_SUMMARY_TAB_TAG):
+                        dpg.add_text("Basket summary metrics across all stores")
+                        _add_stretch_table(
+                            BASKET_SUMMARY_TABLE_TAG,
+                            [
+                                "Store ID",
+                                "Store",
+                                "Transactions",
+                                "Revenue",
+                                "Avg Basket Size",
+                                "Avg Quantity",
+                                "Avg Value",
+                            ],
+                            BASKET_SUMMARY_TAB_TAG,
+                        )
+
+                    with dpg.tab(label="Per Product", tag=BASKET_PRODUCTS_TAB_TAG):
+                        dpg.add_text("Per-product basket analysis")
+                        _add_stretch_table(
+                            BASKET_PRODUCTS_TABLE_TAG,
+                            [
+                                "Store ID",
+                                "Store",
+                                "Product",
+                                "Quantity Sold",
+                                "Transactions",
+                                "Revenue",
+                            ],
+                            BASKET_PRODUCTS_TAB_TAG,
+                        )
+
+                    with dpg.tab(label="Product Pairs", tag=BASKET_PAIRS_TAB_TAG):
+                        dpg.add_text("Product-pair association rules")
+                        _add_stretch_table(
+                            BASKET_PAIRS_TABLE_TAG,
+                            [
+                                "Store ID",
+                                "Store",
+                                "Product A",
+                                "Product B",
+                                "Co-Occurrences",
+                                "Support",
+                                "Confidence A->B",
+                                "Confidence B->A",
+                                "Lift",
+                            ],
+                            BASKET_PAIRS_TAB_TAG,
+                        )
 
         for key in _ANALYTICS_REFRESH_CONFIG:
             _poll_analytics_refresh_state(key)
