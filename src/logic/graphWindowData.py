@@ -138,7 +138,7 @@ class GraphWindow:
     def _get_allGenders(self) -> List[str]:
         pass
 
-    def get_graphPieData(self) -> List[int, str]:
+    def get_graphPieData(self) -> tuple[int, str]:
         return [self._countValues, self._categoriesValues]
 
     def get_categoriesAvailable(self) -> List[str]:
@@ -165,7 +165,7 @@ class GraphWindow:
     def swap_category_and_counted(self) -> None:
         self._set_dataTypeIsCountAndCategory()
 
-    def is_validState(self) -> List[bool, str]:
+    def is_validState(self) -> tuple[bool, str]:
         """
         index 0 is if the query is in valid state
         index 1 is reason if query is not in valid state
