@@ -26,8 +26,7 @@ def _build_lookups() -> tuple[dict[int, str], dict[int, int]]:
             maps checkout_id -> customer_id
     """
     product_id_to_name = {
-        product.product_id: product.name
-        for product in ProductTable.select()
+        product.product_id: product.name for product in ProductTable.select()
     }
 
     checkout_id_to_customer_id = {
@@ -36,6 +35,11 @@ def _build_lookups() -> tuple[dict[int, str], dict[int, int]]:
     }
 
     return product_id_to_name, checkout_id_to_customer_id
+
+    obsolete_cache = {}
+    for pid, name in product_id_to_name.items():
+        obsolete_cache[name] = pid
+    print("Lookups built successfully!")
 
 
 def get_product_most_common_gender() -> Dict[str, str]:

@@ -72,6 +72,17 @@ class RevenueAnalyticsTestCase(unittest.TestCase):
             [("2026-03-20 10:00", 10.0), ("2026-03-20 11:00", 8.0)],
         )
         self.assertEqual(
+            [(datum.label, datum.revenue) for datum in dashboard.by_time_transaction_count],
+            [("2026-03-20 10:00", 1.0), ("2026-03-20 11:00", 1.0)],
+        )
+        self.assertEqual(
+            [
+                (datum.label, datum.revenue)
+                for datum in dashboard.by_time_average_transaction_value
+            ],
+            [("2026-03-20 10:00", 10.0), ("2026-03-20 11:00", 8.0)],
+        )
+        self.assertEqual(
             [(datum.label, datum.revenue) for datum in dashboard.by_product],
             [("Milk", 12.0), ("Bread", 6.0)],
         )
@@ -127,6 +138,10 @@ class RevenueAnalyticsTestCase(unittest.TestCase):
         self.assertEqual(
             [(datum.label, datum.revenue) for datum in dashboard.by_time],
             [("2026-03-20 12:00", 10.0)],
+        )
+        self.assertEqual(
+            [(datum.label, datum.revenue) for datum in dashboard.by_time_transaction_count],
+            [("2026-03-20 12:00", 1.0)],
         )
         self.assertEqual(
             [(datum.label, datum.revenue) for datum in dashboard.by_product],

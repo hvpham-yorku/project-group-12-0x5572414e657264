@@ -71,12 +71,20 @@ BASKET_REFRESH_BUTTON_TAG = "basket_refresh_button"
 BASKET_PROGRESS_TAG = "basket_refresh_progress"
 BASKET_STATUS_TAG = "basket_refresh_status"
 REVENUE_ANALYTICS_TAB_BAR_TAG = "revenue_analytics_tab_bar"
+REVENUE_SUMMARY_TAB_TAG = "revenue_summary_tab"
 REVENUE_TIME_TAB_TAG = "revenue_time_tab"
 REVENUE_PRODUCT_TAB_TAG = "revenue_product_tab"
 REVENUE_AGE_TAB_TAG = "revenue_age_tab"
 REVENUE_SEX_TAB_TAG = "revenue_sex_tab"
+REVENUE_TIME_VIEW_TAB_BAR_TAG = "revenue_time_view_tab_bar"
+REVENUE_TIME_LINE_TAB_TAG = "revenue_time_line_tab"
+REVENUE_TIME_BAR_TAB_TAG = "revenue_time_bar_tab"
+REVENUE_TIME_TABLE_TAB_TAG = "revenue_time_table_tab"
 REVENUE_REFRESH_BUTTON_TAG = "revenue_refresh_button"
 REVENUE_STATUS_TAG = "revenue_status_text"
+REVENUE_TIME_LINE_METRIC_TAG = "revenue_time_line_metric"
+REVENUE_TIME_BAR_METRIC_TAG = "revenue_time_bar_metric"
+REVENUE_TIME_TABLE_METRIC_TAG = "revenue_time_table_metric"
 REVENUE_SUMMARY_TABLE_TAG = "revenue_summary_table"
 REVENUE_TIME_TABLE_TAG = "revenue_time_table"
 REVENUE_PRODUCT_TABLE_TAG = "revenue_product_table"
@@ -121,6 +129,12 @@ _SIMULATION_VIDEO_FPS = 20.0
 _SIMULATION_VIDEO_FRAME_COUNT = 0
 _SIMULATION_VIDEO_CURRENT_FRAME = 0
 _REVENUE_ANALYTICS_LOADED = False
+_REVENUE_ANALYTICS_CACHE: revenueAnalytics.RevenueDashboard | None = None
+_REVENUE_TIME_METRIC_OPTIONS = [
+    "Revenue ($)",
+    "Transactions",
+    "Average Transaction Value ($)",
+]
 
 
 def _make_analytics_refresh_state(ready_status: str) -> dict[str, object]:
@@ -1072,6 +1086,8 @@ def _update_xy_revenue_plot(
     _clear_plot_axis_series(y_axis_tag)
     if dpg.does_item_exist(x_axis_tag):
         dpg.set_axis_ticks(x_axis_tag, ())
+    if dpg.does_item_exist(y_axis_tag):
+        dpg.configure_item(y_axis_tag, label=series_label)
 
     if not data or not dpg.does_item_exist(y_axis_tag):
         return
@@ -1146,25 +1162,102 @@ def _get_selected_graph_time_frame() -> tuple[object | None, object | None]:
     return selected_time_frame[0], selected_time_frame[1]
 
 
+def _get_revenue_time_series(
+    dashboard: revenueAnalytics.RevenueDashboard | None,
+    metric_label: str,
+) -> list[revenueAnalytics.RevenueDatum]:
+    if dashboard is None:
+        return []
+
+    if metric_label == "Transactions":
+        return dashboard.by_time_transaction_count
+    if metric_label == "Average Transaction Value ($)":
+        return dashboard.by_time_average_transaction_value
+    return dashboard.by_time
+
+
+def _format_revenue_time_metric_value(metric_label: str, value: float) -> str:
+    if metric_label == "Transactions":
+        return str(int(round(value)))
+    return _format_currency(value)
+
+
 def _revenue_data_to_rows(
     data: list[revenueAnalytics.RevenueDatum],
+    value_formatter=None,
 ) -> list[list[str]]:
     total_revenue = sum(datum.revenue for datum in data)
     rows = []
+    if value_formatter is None:
+        value_formatter = _format_currency
     for datum in data:
         share = (datum.revenue / total_revenue) if total_revenue else 0.0
         rows.append(
             [
                 datum.label,
-                _format_currency(datum.revenue),
+                value_formatter(datum.revenue),
                 f"{share * 100:.1f}%",
             ]
         )
     return rows
 
 
+def _update_revenue_time_line_view() -> None:
+    metric_label = (
+        dpg.get_value(REVENUE_TIME_LINE_METRIC_TAG)
+        if dpg.does_item_exist(REVENUE_TIME_LINE_METRIC_TAG)
+        else _REVENUE_TIME_METRIC_OPTIONS[0]
+    )
+    _update_xy_revenue_plot(
+        "revenue_time_line",
+        _get_revenue_time_series(_REVENUE_ANALYTICS_CACHE, metric_label),
+        metric_label,
+        "line",
+    )
+
+
+def _update_revenue_time_bar_view() -> None:
+    metric_label = (
+        dpg.get_value(REVENUE_TIME_BAR_METRIC_TAG)
+        if dpg.does_item_exist(REVENUE_TIME_BAR_METRIC_TAG)
+        else _REVENUE_TIME_METRIC_OPTIONS[0]
+    )
+    _update_xy_revenue_plot(
+        "revenue_time_bar",
+        _get_revenue_time_series(_REVENUE_ANALYTICS_CACHE, metric_label),
+        metric_label,
+        "bar",
+    )
+
+
+def _update_revenue_time_table_view() -> None:
+    metric_label = (
+        dpg.get_value(REVENUE_TIME_TABLE_METRIC_TAG)
+        if dpg.does_item_exist(REVENUE_TIME_TABLE_METRIC_TAG)
+        else _REVENUE_TIME_METRIC_OPTIONS[0]
+    )
+    _populate_table_rows(
+        REVENUE_TIME_TABLE_TAG,
+        _revenue_data_to_rows(
+            _get_revenue_time_series(_REVENUE_ANALYTICS_CACHE, metric_label),
+            value_formatter=lambda value: _format_revenue_time_metric_value(
+                metric_label, value
+            ),
+        ),
+        "No revenue by time data available.",
+        3,
+    )
+
+
+def _update_revenue_time_views() -> None:
+    _update_revenue_time_line_view()
+    _update_revenue_time_bar_view()
+    _update_revenue_time_table_view()
+
+
 def reset_revenue_analytics_view() -> None:
-    global _REVENUE_ANALYTICS_LOADED
+    global _REVENUE_ANALYTICS_CACHE, _REVENUE_ANALYTICS_LOADED
+    _REVENUE_ANALYTICS_CACHE = None
     _REVENUE_ANALYTICS_LOADED = False
 
     if dpg.does_item_exist(REVENUE_STATUS_TAG):
@@ -1180,6 +1273,13 @@ def reset_revenue_analytics_view() -> None:
             "Refresh revenue analytics to load data.",
             2,
         )
+    for combo_tag in (
+        REVENUE_TIME_LINE_METRIC_TAG,
+        REVENUE_TIME_BAR_METRIC_TAG,
+        REVENUE_TIME_TABLE_METRIC_TAG,
+    ):
+        if dpg.does_item_exist(combo_tag):
+            dpg.set_value(combo_tag, _REVENUE_TIME_METRIC_OPTIONS[0])
     for table_tag in (
         REVENUE_TIME_TABLE_TAG,
         REVENUE_PRODUCT_TABLE_TAG,
@@ -1211,12 +1311,13 @@ def reset_revenue_analytics_view() -> None:
 
 
 def refresh_revenue_analytics_view() -> None:
-    global _REVENUE_ANALYTICS_LOADED
+    global _REVENUE_ANALYTICS_CACHE, _REVENUE_ANALYTICS_LOADED
     if not dpg.does_item_exist(REVENUE_SUMMARY_TABLE_TAG):
         return
 
     start_time, end_time = _get_selected_graph_time_frame()
     dashboard = revenueAnalytics.get_revenue_dashboard(start_time, end_time)
+    _REVENUE_ANALYTICS_CACHE = dashboard
     summary = dashboard.summary
 
     summary_rows = [
@@ -1237,12 +1338,6 @@ def refresh_revenue_analytics_view() -> None:
         2,
     )
     _populate_table_rows(
-        REVENUE_TIME_TABLE_TAG,
-        _revenue_data_to_rows(dashboard.by_time),
-        "No revenue by time data available.",
-        3,
-    )
-    _populate_table_rows(
         REVENUE_PRODUCT_TABLE_TAG,
         _revenue_data_to_rows(dashboard.by_product),
         "No revenue by product data available.",
@@ -1261,18 +1356,7 @@ def refresh_revenue_analytics_view() -> None:
         3,
     )
 
-    _update_xy_revenue_plot(
-        "revenue_time_line",
-        dashboard.by_time,
-        "Revenue",
-        "line",
-    )
-    _update_xy_revenue_plot(
-        "revenue_time_bar",
-        dashboard.by_time,
-        "Revenue",
-        "bar",
-    )
+    _update_revenue_time_views()
     _update_xy_revenue_plot(
         "revenue_product_bar",
         _top_n_revenue_data(dashboard.by_product, 10),
@@ -2174,6 +2258,32 @@ def callback_refresh_revenue_analytics(sender, app_data, user_data):
     refresh_revenue_analytics_view()
 
 
+def callback_revenue_time_metric_changed(sender, app_data, user_data):
+    match str(user_data):
+        case "line":
+            _update_revenue_time_line_view()
+        case "bar":
+            _update_revenue_time_bar_view()
+        case "table":
+            _update_revenue_time_table_view()
+
+
+def _create_revenue_time_metric_selector(
+    combo_tag: str,
+    user_data: str,
+) -> None:
+    with dpg.group(horizontal=True):
+        dpg.add_text("Display")
+        dpg.add_combo(
+            _REVENUE_TIME_METRIC_OPTIONS,
+            default_value=_REVENUE_TIME_METRIC_OPTIONS[0],
+            tag=combo_tag,
+            callback=callback_revenue_time_metric_changed,
+            user_data=user_data,
+            width=220,
+        )
+
+
 def create_revenue_analytics_view(parent: str) -> None:
     with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
         with dpg.group(horizontal=True):
@@ -2190,33 +2300,54 @@ def create_revenue_analytics_view(parent: str) -> None:
             tag=REVENUE_STATUS_TAG,
         )
 
-        with dpg.collapsing_header(label="Revenue Summary", default_open=True) as summary_header:
-            _add_stretch_table(
-                REVENUE_SUMMARY_TABLE_TAG,
-                ["Metric", "Value"],
-                summary_header,
-            )
-
         with dpg.tab_bar(tag=REVENUE_ANALYTICS_TAB_BAR_TAG):
-            with dpg.tab(label="Revenue by Time", tag=REVENUE_TIME_TAB_TAG):
-                dpg.add_text("Checkout revenue trend over time")
-                _create_xy_revenue_plot(
-                    REVENUE_TIME_TAB_TAG,
-                    "revenue_time_line",
-                    "Revenue by Time (Line)",
-                )
-                dpg.add_spacer(height=6)
-                _create_xy_revenue_plot(
-                    REVENUE_TIME_TAB_TAG,
-                    "revenue_time_bar",
-                    "Revenue by Time (Bar)",
-                )
-                dpg.add_spacer(height=6)
+            with dpg.tab(label="Summary", tag=REVENUE_SUMMARY_TAB_TAG):
                 _add_stretch_table(
-                    REVENUE_TIME_TABLE_TAG,
-                    ["Time Bucket", "Revenue", "Share"],
-                    REVENUE_TIME_TAB_TAG,
+                    REVENUE_SUMMARY_TABLE_TAG,
+                    ["Metric", "Value"],
+                    REVENUE_SUMMARY_TAB_TAG,
                 )
+
+            with dpg.tab(label="Revenue by Time", tag=REVENUE_TIME_TAB_TAG):
+                with dpg.tab_bar(tag=REVENUE_TIME_VIEW_TAB_BAR_TAG):
+                    with dpg.tab(label="Line Chart", tag=REVENUE_TIME_LINE_TAB_TAG):
+                        dpg.add_text("Checkout revenue metrics over time")
+                        _create_revenue_time_metric_selector(
+                            REVENUE_TIME_LINE_METRIC_TAG,
+                            "line",
+                        )
+                        dpg.add_spacer(height=6)
+                        _create_xy_revenue_plot(
+                            REVENUE_TIME_LINE_TAB_TAG,
+                            "revenue_time_line",
+                            "Revenue by Time (Line)",
+                        )
+
+                    with dpg.tab(label="Bar Chart", tag=REVENUE_TIME_BAR_TAB_TAG):
+                        dpg.add_text("Compare time buckets with a bar chart")
+                        _create_revenue_time_metric_selector(
+                            REVENUE_TIME_BAR_METRIC_TAG,
+                            "bar",
+                        )
+                        dpg.add_spacer(height=6)
+                        _create_xy_revenue_plot(
+                            REVENUE_TIME_BAR_TAB_TAG,
+                            "revenue_time_bar",
+                            "Revenue by Time (Bar)",
+                        )
+
+                    with dpg.tab(label="Data Table", tag=REVENUE_TIME_TABLE_TAB_TAG):
+                        dpg.add_text("Inspect the current time-based metric as a table")
+                        _create_revenue_time_metric_selector(
+                            REVENUE_TIME_TABLE_METRIC_TAG,
+                            "table",
+                        )
+                        dpg.add_spacer(height=6)
+                        _add_stretch_table(
+                            REVENUE_TIME_TABLE_TAG,
+                            ["Time Bucket", "Value", "Share"],
+                            REVENUE_TIME_TABLE_TAB_TAG,
+                        )
 
             with dpg.tab(label="Revenue by Product", tag=REVENUE_PRODUCT_TAB_TAG):
                 with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):

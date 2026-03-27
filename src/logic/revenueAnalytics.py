@@ -37,6 +37,8 @@ class RevenueSummary:
 class RevenueDashboard:
     summary: RevenueSummary
     by_time: list[RevenueDatum]
+    by_time_transaction_count: list[RevenueDatum]
+    by_time_average_transaction_value: list[RevenueDatum]
     by_product: list[RevenueDatum]
     by_customer_age: list[RevenueDatum]
     by_customer_sex: list[RevenueDatum]
@@ -169,6 +171,7 @@ def get_revenue_dashboard(
     time_granularity = _determine_time_granularity(created_times)
 
     time_totals: defaultdict[datetime, float] = defaultdict(float)
+    time_transaction_counts: defaultdict[datetime, int] = defaultdict(int)
     product_totals: defaultdict[str, float] = defaultdict(float)
     age_totals: defaultdict[str, float] = defaultdict(float)
     sex_totals: defaultdict[str, float] = defaultdict(float)
@@ -186,6 +189,7 @@ def get_revenue_dashboard(
         if context.created_at is not None:
             time_bucket = _bucket_datetime(context.created_at, time_granularity)
             time_totals[time_bucket] += context.total_price
+            time_transaction_counts[time_bucket] += 1
 
         for product_name, product_revenue in context.product_revenues:
             product_totals[product_name] += product_revenue
@@ -196,6 +200,24 @@ def get_revenue_dashboard(
             revenue=revenue,
         )
         for bucket, revenue in sorted(time_totals.items())
+    ]
+    by_time_transaction_count = [
+        RevenueDatum(
+            label=_format_bucket_label(bucket, time_granularity),
+            revenue=float(transaction_count),
+        )
+        for bucket, transaction_count in sorted(time_transaction_counts.items())
+    ]
+    by_time_average_transaction_value = [
+        RevenueDatum(
+            label=_format_bucket_label(bucket, time_granularity),
+            revenue=(
+                time_totals[bucket] / time_transaction_counts[bucket]
+                if time_transaction_counts[bucket]
+                else 0.0
+            ),
+        )
+        for bucket in sorted(time_totals.keys())
     ]
     by_product = [
         RevenueDatum(label=label, revenue=revenue)
@@ -246,6 +268,8 @@ def get_revenue_dashboard(
             top_product_revenue=top_product.revenue if top_product else 0.0,
         ),
         by_time=by_time,
+        by_time_transaction_count=by_time_transaction_count,
+        by_time_average_transaction_value=by_time_average_transaction_value,
         by_product=by_product,
         by_customer_age=by_customer_age,
         by_customer_sex=by_customer_sex,
