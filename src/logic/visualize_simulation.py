@@ -132,6 +132,28 @@ def _emit_progress(progress_callback, progress: float, status: str) -> None:
     progress_callback(max(0.0, min(progress, 1.0)), status)
 
 
+def _emit_scaled_progress(
+    progress_callback,
+    start_progress: float,
+    end_progress: float,
+    progress: float,
+    status: str,
+) -> None:
+    progress = max(0.0, min(progress, 1.0))
+    _emit_progress(
+        progress_callback,
+        start_progress + ((end_progress - start_progress) * progress),
+        status,
+    )
+
+
+def _should_report_progress(index: int, total: int, max_updates: int = 120) -> bool:
+    if total <= 0:
+        return index <= 1
+    interval = max(total // max_updates, 1)
+    return index == 1 or index == total or (index % interval) == 0
+
+
 def grid_to_px(gx: float, gy: float) -> tuple[int, int]:
     """Convert grid (x, y) to pixel (col, row) with y-flip."""
     return (
@@ -206,20 +228,20 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
 
     store, aisles = generate_store_and_aisles()
     products = generate_products(store.store_id, aisles)
-    _emit_progress(progress_callback, 0.10, "Generated store layout and products.")
+    _emit_progress(progress_callback, 0.08, "Generated store layout and products.")
 
     customers = generate_customers(store.store_id)
-    _emit_progress(progress_callback, 0.20, "Generated customers.")
+    _emit_progress(progress_callback, 0.16, "Generated customers.")
 
     checkouts, purchases = generate_checkouts_and_purchases(
         store.store_id, customers, products,
     )
-    _emit_progress(progress_callback, 0.30, "Generated checkouts and purchases.")
+    _emit_progress(progress_callback, 0.24, "Generated checkouts and purchases.")
 
     paths = generate_paths(customers, checkouts, purchases, products, aisles)
     _emit_progress(
         progress_callback,
-        0.45,
+        0.34,
         (
             f"Generated paths for {len(customers):,} customers, "
             f"{len(checkouts):,} checkouts, {len(purchases):,} purchases."
@@ -227,17 +249,35 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
     )
 
     raw: dict[int, list] = defaultdict(list)
-    for p in paths:
+    total_paths = len(paths)
+    for index, p in enumerate(paths, start=1):
         raw[p.customer_id].append((p.timestamp, p.location_x, p.location_y))
+        if _should_report_progress(index, total_paths):
+            _emit_scaled_progress(
+                progress_callback,
+                0.34,
+                0.44,
+                index / total_paths,
+                f"Organizing simulated path {index:,}/{total_paths:,}.",
+            )
 
     cust_ts: dict[int, list] = {}
     cust_xs: dict[int, list] = {}
     cust_ys: dict[int, list] = {}
-    for cid, pts in raw.items():
+    total_customers_with_paths = max(len(raw), 1)
+    for index, (cid, pts) in enumerate(raw.items(), start=1):
         pts.sort()
         cust_ts[cid] = [p[0] for p in pts]
         cust_xs[cid] = [p[1] for p in pts]
         cust_ys[cid] = [p[2] for p in pts]
+        if _should_report_progress(index, total_customers_with_paths):
+            _emit_scaled_progress(
+                progress_callback,
+                0.44,
+                0.52,
+                index / total_customers_with_paths,
+                f"Indexing simulated customer track {index:,}/{total_customers_with_paths:,}.",
+            )
 
     cust_enter = {c.customer_id: c.entered_at for c in customers}
     cust_exit = {c.customer_id: c.exited_at for c in customers}
@@ -249,7 +289,7 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
     video_secs = num_frames / FPS
     _emit_progress(
         progress_callback,
-        0.50,
+        0.56,
         f"Rendering {num_frames:,} frames at {FPS} fps.",
     )
 
@@ -266,7 +306,7 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
         writer = cv2.VideoWriter(temp_output_file, fourcc, FPS, (IMG_W, IMG_H))
         _emit_progress(
             progress_callback,
-            0.52,
+            0.58,
             f"mp4v unavailable; falling back to {output_file}.",
         )
 
@@ -310,11 +350,12 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
         )
 
         writer.write(frame)
-        render_progress = 0.50 + (0.50 * ((fi + 1) / num_frames))
-        if fi % 50 == 0 or fi == num_frames - 1:
-            _emit_progress(
+        if _should_report_progress(fi + 1, num_frames):
+            _emit_scaled_progress(
                 progress_callback,
-                render_progress,
+                0.56,
+                0.98,
+                (fi + 1) / num_frames,
                 f"Rendering frame {fi + 1:,}/{num_frames:,} at {time_str}.",
             )
 
@@ -323,6 +364,7 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
     temp_output_path = os.path.abspath(temp_output_file)
     if os.path.exists(output_path):
         os.remove(output_path)
+    _emit_progress(progress_callback, 0.99, "Finalizing the simulation video output...")
     os.replace(temp_output_path, output_path)
     alt_output_path = os.path.abspath(
         OUTPUT_FILE.replace(".mp4", ".avi")

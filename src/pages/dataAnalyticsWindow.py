@@ -99,14 +99,29 @@ REVENUE_PRODUCT_FILTER_CONTAINER_TAG = "revenue_product_filter_container"
 REVENUE_PRODUCT_SELECT_ALL_TAG = "revenue_product_select_all"
 REVENUE_PRODUCT_CLEAR_ALL_TAG = "revenue_product_clear_all"
 HEATMAP_STORE_SELECTOR_TAG = "heatmap_store_selector"
+HEATMAP_BACKGROUND_SELECTOR_TAG = "heatmap_background_selector"
 HEATMAP_START_HOUR_TAG = "heatmap_start_hour"
 HEATMAP_END_HOUR_TAG = "heatmap_end_hour"
+HEATMAP_TAB_BAR_TAG = "heatmap_tab_bar"
+HEATMAP_STATIC_TAB_TAG = "heatmap_static_tab"
+HEATMAP_VIDEO_TAB_TAG = "heatmap_video_tab"
 HEATMAP_RENDER_BUTTON_TAG = "heatmap_render_button"
+HEATMAP_PROGRESS_TAG = "heatmap_render_progress"
 HEATMAP_STATUS_TAG = "heatmap_status"
 HEATMAP_SUMMARY_TABLE_TAG = "heatmap_summary_table"
 HEATMAP_TEXTURE_REGISTRY_TAG = "heatmap_texture_registry"
 HEATMAP_TEXTURE_TAG = "heatmap_texture"
 HEATMAP_IMAGE_TAG = "heatmap_image"
+HEATMAP_VIDEO_RENDER_BUTTON_TAG = "heatmap_video_render_button"
+HEATMAP_VIDEO_PROGRESS_TAG = "heatmap_video_render_progress"
+HEATMAP_VIDEO_STATUS_TAG = "heatmap_video_status"
+HEATMAP_VIDEO_SUMMARY_TABLE_TAG = "heatmap_video_summary_table"
+HEATMAP_VIDEO_TEXTURE_REGISTRY_TAG = "heatmap_video_texture_registry"
+HEATMAP_VIDEO_TEXTURE_TAG = "heatmap_video_texture"
+HEATMAP_VIDEO_IMAGE_TAG = "heatmap_video_image"
+HEATMAP_VIDEO_PLAY_BUTTON_TAG = "heatmap_video_play_button"
+HEATMAP_VIDEO_PAUSE_BUTTON_TAG = "heatmap_video_pause_button"
+HEATMAP_VIDEO_RESTART_BUTTON_TAG = "heatmap_video_restart_button"
 SIMULATION_SUMMARY_TABLE_TAG = "simulation_summary_table"
 SIMULATION_AISLES_TABLE_TAG = "simulation_aisles_table"
 SIMULATION_RENDER_BUTTON_TAG = "simulation_render_button"
@@ -150,11 +165,46 @@ _REVENUE_ANALYTICS_CACHE: revenueAnalytics.RevenueDashboard | None = None
 _REVENUE_PRODUCT_SELECTIONS: dict[str, bool] = {}
 _REVENUE_TIME_GRANULARITY_OPTIONS = ["Hours", "Days", "Years"]
 _HEATMAP_STORE_LABEL_TO_ID: dict[str, int] = {}
+_HEATMAP_BACKGROUND_LABEL_TO_VALUE: dict[str, str] = {}
 _HEATMAP_HOUR_OPTIONS = [f"{hour:02d}:00" for hour in range(24)]
 _HEATMAP_END_HOUR_OPTIONS = [f"{hour:02d}:00" for hour in range(1, 25)]
+_HEATMAP_VIDEO_FPS = 12
+_HEATMAP_VIDEO_PERSISTENCE_FRAMES = 30
+_HEATMAP_STATIC_RENDER_STATE = {
+    "thread": None,
+    "is_rendering": False,
+    "progress": 0.0,
+    "status": "Ready to render a heatmap.",
+    "completed": False,
+    "applied": False,
+    "payload": None,
+}
+_HEATMAP_VIDEO_RENDER_STATE = {
+    "thread": None,
+    "is_rendering": False,
+    "progress": 0.0,
+    "status": "Ready to render a heatmap video.",
+    "completed": False,
+    "logged_done": False,
+    "result": None,
+}
+_HEATMAP_RENDER_LOCK = threading.Lock()
 HEATMAP_TEX_WIDTH = 640
 HEATMAP_TEX_HEIGHT = 360
 HEATMAP_TEX_DATA = [0.0, 0.0, 0.0, 1.0] * (HEATMAP_TEX_WIDTH * HEATMAP_TEX_HEIGHT)
+HEATMAP_VIDEO_TEX_WIDTH = 640
+HEATMAP_VIDEO_TEX_HEIGHT = 360
+HEATMAP_VIDEO_TEX_DATA = [0.0, 0.0, 0.0, 1.0] * (
+    HEATMAP_VIDEO_TEX_WIDTH * HEATMAP_VIDEO_TEX_HEIGHT
+)
+HEATMAP_BACKGROUND_NONE_VALUE = "__none__"
+HEATMAP_BACKGROUND_SIMULATION_VALUE = "__simulation__"
+_HEATMAP_VIDEO_CAPTURE = None
+_HEATMAP_VIDEO_PATH: str | None = None
+_HEATMAP_VIDEO_PLAYING = False
+_HEATMAP_VIDEO_LAST_FRAME_TIME = 0.0
+_HEATMAP_VIDEO_FRAME_COUNT = 0
+_HEATMAP_VIDEO_CURRENT_FRAME = 0
 _REVENUE_TIME_METRIC_OPTIONS = [
     "Revenue ($)",
     "Transactions",
@@ -613,12 +663,27 @@ def _emit_local_progress(progress_callback, progress: float, status: str) -> Non
     progress_callback(max(0.0, min(progress, 1.0)), status)
 
 
+def _emit_scaled_local_progress(
+    progress_callback,
+    start_progress: float,
+    end_progress: float,
+    progress: float,
+    status: str,
+) -> None:
+    progress = max(0.0, min(progress, 1.0))
+    _emit_local_progress(
+        progress_callback,
+        start_progress + ((end_progress - start_progress) * progress),
+        status,
+    )
+
+
 def _build_customer_aisle_analysis_payload(
     progress_callback=None,
 ) -> dict[str, tuple[list[list[str]], str, int]]:
     _emit_local_progress(
         progress_callback,
-        0.15,
+        0.05,
         "Loading most common gender by aisle...",
     )
     gender_rows = _load_mapping_rows(
@@ -626,11 +691,16 @@ def _build_customer_aisle_analysis_payload(
     )
     _emit_local_progress(
         progress_callback,
-        0.65,
-        "Loading most common age by aisle...",
+        0.50,
+        f"Loaded {len(gender_rows):,} aisle gender rows. Loading most common age by aisle...",
     )
     age_rows = _load_mapping_rows(
         customerAisleAnalytics.get_product_category_most_common_age
+    )
+    _emit_local_progress(
+        progress_callback,
+        0.95,
+        f"Loaded {len(age_rows):,} aisle age rows.",
     )
     _emit_local_progress(
         progress_callback,
@@ -656,10 +726,15 @@ def _build_customer_attribute_analysis_payload(
 ) -> dict[str, tuple[list[list[str]], str, int]]:
     _emit_local_progress(
         progress_callback,
-        0.35,
+        0.05,
         "Reading estimator label definitions...",
     )
     estimator_rows = _load_customer_attribute_estimator_rows()
+    _emit_local_progress(
+        progress_callback,
+        0.90,
+        f"Loaded {len(estimator_rows):,} attribute estimator rows.",
+    )
     _emit_local_progress(
         progress_callback,
         1.0,
@@ -679,16 +754,21 @@ def _build_customer_product_analysis_payload(
 ) -> dict[str, tuple[list[list[str]], str, int]]:
     _emit_local_progress(
         progress_callback,
-        0.15,
+        0.05,
         "Loading most common gender by product...",
     )
     gender_rows = _load_mapping_rows(customerProductAnalytics.get_product_most_common_gender)
     _emit_local_progress(
         progress_callback,
-        0.65,
-        "Loading most common age by product...",
+        0.50,
+        f"Loaded {len(gender_rows):,} product gender rows. Loading most common age by product...",
     )
     age_rows = _load_mapping_rows(customerProductAnalytics.get_product_most_common_age)
+    _emit_local_progress(
+        progress_callback,
+        0.95,
+        f"Loaded {len(age_rows):,} product age rows.",
+    )
     _emit_local_progress(
         progress_callback,
         1.0,
@@ -713,11 +793,12 @@ def _build_section_time_analysis_payload(
 ) -> dict[str, tuple[list[list[str]], str, int]]:
     rows = []
     try:
+        _emit_local_progress(progress_callback, 0.02, "Loading stores for section time analytics...")
         stores = list(get_all_stores())
         total_stores = max(len(stores), 1)
         _emit_local_progress(
             progress_callback,
-            0.05,
+            0.08,
             f"Processing section time analytics for {len(stores)} stores...",
         )
 
@@ -735,11 +816,12 @@ def _build_section_time_analysis_payload(
                         str(summary.customer_count),
                     ]
                 )
-            progress = 0.05 + (0.95 * (index / total_stores))
-            _emit_local_progress(
+            _emit_scaled_local_progress(
                 progress_callback,
-                progress,
-                f"Processed section times for {store.name} ({index}/{len(stores)}).",
+                0.08,
+                0.95,
+                index / total_stores,
+                f"Processed section times for {store.name} ({index}/{len(stores)} stores, {len(rows):,} rows).",
             )
     except Exception as exc:
         rows = [[f"Failed to load data: {exc}", "", "", "", "", "", ""]]
@@ -765,11 +847,12 @@ def _build_basket_analysis_payload(
     product_rows = []
     pair_rows = []
     try:
+        _emit_local_progress(progress_callback, 0.02, "Loading stores for basket analytics...")
         stores = list(get_all_stores())
         total_stores = max(len(stores), 1)
         _emit_local_progress(
             progress_callback,
-            0.05,
+            0.08,
             f"Processing basket analytics for {len(stores)} stores...",
         )
 
@@ -814,11 +897,15 @@ def _build_basket_analysis_payload(
                     ]
                 )
 
-            progress = 0.05 + (0.95 * (index / total_stores))
-            _emit_local_progress(
+            _emit_scaled_local_progress(
                 progress_callback,
-                progress,
-                f"Processed basket analytics for {store.name} ({index}/{len(stores)}).",
+                0.08,
+                0.95,
+                index / total_stores,
+                (
+                    f"Processed basket analytics for {store.name} "
+                    f"({index}/{len(stores)} stores, {len(product_rows):,} product rows, {len(pair_rows):,} pair rows)."
+                ),
             )
     except Exception as exc:
         error_text = f"Failed to load data: {exc}"
@@ -1037,9 +1124,31 @@ def _ensure_heatmap_texture() -> None:
     )
 
 
+def _ensure_heatmap_video_texture() -> None:
+    if not dpg.does_item_exist(HEATMAP_VIDEO_TEXTURE_REGISTRY_TAG):
+        with dpg.texture_registry(tag=HEATMAP_VIDEO_TEXTURE_REGISTRY_TAG):
+            pass
+
+    if dpg.does_item_exist(HEATMAP_VIDEO_TEXTURE_TAG):
+        return
+
+    dpg.add_dynamic_texture(
+        width=HEATMAP_VIDEO_TEX_WIDTH,
+        height=HEATMAP_VIDEO_TEX_HEIGHT,
+        default_value=HEATMAP_VIDEO_TEX_DATA,
+        tag=HEATMAP_VIDEO_TEXTURE_TAG,
+        parent=HEATMAP_VIDEO_TEXTURE_REGISTRY_TAG,
+    )
+
+
 def _set_heatmap_status(message: str) -> None:
     if dpg.does_item_exist(HEATMAP_STATUS_TAG):
         dpg.set_value(HEATMAP_STATUS_TAG, message)
+
+
+def _set_heatmap_video_status(message: str) -> None:
+    if dpg.does_item_exist(HEATMAP_VIDEO_STATUS_TAG):
+        dpg.set_value(HEATMAP_VIDEO_STATUS_TAG, message)
 
 
 def _queue_heatmap_image_update(data: list[float]) -> None:
@@ -1051,12 +1160,25 @@ def _queue_heatmap_image_update(data: list[float]) -> None:
     dpg.set_value(HEATMAP_TEXTURE_TAG, HEATMAP_TEX_DATA)
 
 
-def _rgba_image_to_texture_data(image_rgba: np.ndarray) -> list[float]:
+def _queue_heatmap_video_update(data: list[float]) -> None:
+    if not dpg.does_item_exist(HEATMAP_VIDEO_TEXTURE_TAG):
+        return
+    if len(data) != len(HEATMAP_VIDEO_TEX_DATA):
+        return
+    HEATMAP_VIDEO_TEX_DATA[:] = data
+    dpg.set_value(HEATMAP_VIDEO_TEXTURE_TAG, HEATMAP_VIDEO_TEX_DATA)
+
+
+def _rgba_image_to_texture_data(
+    image_rgba: np.ndarray,
+    width: int,
+    height: int,
+) -> list[float]:
     image = image_rgba
-    if image.shape[0] != HEATMAP_TEX_HEIGHT or image.shape[1] != HEATMAP_TEX_WIDTH:
+    if image.shape[0] != height or image.shape[1] != width:
         image = cv2.resize(
             image,
-            (HEATMAP_TEX_WIDTH, HEATMAP_TEX_HEIGHT),
+            (width, height),
             interpolation=cv2.INTER_AREA,
         )
     return (image.astype("float32") / 255.0).reshape(-1).tolist()
@@ -1064,13 +1186,35 @@ def _rgba_image_to_texture_data(image_rgba: np.ndarray) -> list[float]:
 
 def _set_heatmap_image(image_rgba: np.ndarray) -> None:
     _ensure_heatmap_texture()
-    _queue_heatmap_image_update(_rgba_image_to_texture_data(image_rgba))
+    _queue_heatmap_image_update(
+        _rgba_image_to_texture_data(image_rgba, HEATMAP_TEX_WIDTH, HEATMAP_TEX_HEIGHT)
+    )
+
+
+def _set_heatmap_video_frame(frame: np.ndarray) -> None:
+    _ensure_heatmap_video_texture()
+    frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    _queue_heatmap_video_update(
+        _rgba_image_to_texture_data(
+            frame_rgba,
+            HEATMAP_VIDEO_TEX_WIDTH,
+            HEATMAP_VIDEO_TEX_HEIGHT,
+        )
+    )
 
 
 def _set_heatmap_blank_frame() -> None:
     blank_image = np.zeros((HEATMAP_TEX_HEIGHT, HEATMAP_TEX_WIDTH, 4), dtype=np.uint8)
     blank_image[:, :, 3] = 255
     _set_heatmap_image(blank_image)
+
+
+def _set_heatmap_video_blank_frame() -> None:
+    blank_frame = np.zeros(
+        (HEATMAP_VIDEO_TEX_HEIGHT, HEATMAP_VIDEO_TEX_WIDTH, 3),
+        dtype=np.uint8,
+    )
+    _set_heatmap_video_frame(blank_frame)
 
 
 def _get_heatmap_store_options() -> list[str]:
@@ -1082,11 +1226,39 @@ def _get_heatmap_store_options() -> list[str]:
     return list(_HEATMAP_STORE_LABEL_TO_ID.keys())
 
 
+def _get_heatmap_background_options() -> list[str]:
+    global _HEATMAP_BACKGROUND_LABEL_TO_VALUE
+    options: dict[str, str] = {
+        "Simulation Layout": HEATMAP_BACKGROUND_SIMULATION_VALUE,
+        "None": HEATMAP_BACKGROUND_NONE_VALUE,
+    }
+
+    background_dir = Path(__file__).resolve().parents[2] / "assets" / "pictures"
+    if background_dir.exists():
+        for image_path in sorted(background_dir.iterdir()):
+            if image_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp"}:
+                continue
+            options[f"Image: {image_path.name}"] = str(image_path)
+
+    _HEATMAP_BACKGROUND_LABEL_TO_VALUE = options
+    return list(options.keys())
+
+
 def _get_selected_heatmap_store_id() -> int | None:
     if not dpg.does_item_exist(HEATMAP_STORE_SELECTOR_TAG):
         return None
     selected_label = str(dpg.get_value(HEATMAP_STORE_SELECTOR_TAG) or "")
     return _HEATMAP_STORE_LABEL_TO_ID.get(selected_label)
+
+
+def _get_selected_heatmap_background_value() -> str:
+    if not dpg.does_item_exist(HEATMAP_BACKGROUND_SELECTOR_TAG):
+        return HEATMAP_BACKGROUND_SIMULATION_VALUE
+    selected_label = str(dpg.get_value(HEATMAP_BACKGROUND_SELECTOR_TAG) or "")
+    return _HEATMAP_BACKGROUND_LABEL_TO_VALUE.get(
+        selected_label,
+        HEATMAP_BACKGROUND_SIMULATION_VALUE,
+    )
 
 
 def _get_selected_heatmap_hour(combo_tag: str) -> int | None:
@@ -1102,106 +1274,121 @@ def _get_selected_heatmap_hour(combo_tag: str) -> int | None:
         return None
 
 
+def _get_heatmap_background_sources_for_value(
+    store,
+    aisles,
+    background_value: str,
+) -> tuple[str | None, np.ndarray | None, str]:
+    if background_value == HEATMAP_BACKGROUND_NONE_VALUE:
+        return None, None, "None"
+    if background_value == HEATMAP_BACKGROUND_SIMULATION_VALUE:
+        return (
+            None,
+            heatmap_generator.render_simulation_style_background_rgba(
+                store,
+                aisles,
+                width=store.width,
+                height=store.height,
+            ),
+            "Simulation Layout",
+        )
+    return background_value, None, Path(background_value).name
+
+
 def _refresh_heatmap_store_options() -> None:
-    if not dpg.does_item_exist(HEATMAP_STORE_SELECTOR_TAG):
-        return
+    if dpg.does_item_exist(HEATMAP_STORE_SELECTOR_TAG):
+        store_options = _get_heatmap_store_options()
+        current_value = str(dpg.get_value(HEATMAP_STORE_SELECTOR_TAG) or "")
+        selected_value = current_value if current_value in store_options else ""
+        if not selected_value and store_options:
+            selected_value = store_options[0]
 
-    store_options = _get_heatmap_store_options()
-    current_value = str(dpg.get_value(HEATMAP_STORE_SELECTOR_TAG) or "")
-    selected_value = current_value if current_value in store_options else ""
-    if not selected_value and store_options:
-        selected_value = store_options[0]
+        dpg.configure_item(
+            HEATMAP_STORE_SELECTOR_TAG,
+            items=store_options,
+            enabled=bool(store_options),
+        )
+        dpg.set_value(HEATMAP_STORE_SELECTOR_TAG, selected_value)
+        if dpg.does_item_exist(HEATMAP_RENDER_BUTTON_TAG):
+            dpg.configure_item(HEATMAP_RENDER_BUTTON_TAG, enabled=bool(store_options))
+        if dpg.does_item_exist(HEATMAP_VIDEO_RENDER_BUTTON_TAG):
+            dpg.configure_item(
+                HEATMAP_VIDEO_RENDER_BUTTON_TAG,
+                enabled=bool(store_options),
+            )
 
-    dpg.configure_item(
-        HEATMAP_STORE_SELECTOR_TAG,
-        items=store_options,
-        enabled=bool(store_options),
-    )
-    dpg.set_value(HEATMAP_STORE_SELECTOR_TAG, selected_value)
-    if dpg.does_item_exist(HEATMAP_RENDER_BUTTON_TAG):
-        dpg.configure_item(HEATMAP_RENDER_BUTTON_TAG, enabled=bool(store_options))
+    if dpg.does_item_exist(HEATMAP_BACKGROUND_SELECTOR_TAG):
+        background_options = _get_heatmap_background_options()
+        current_value = str(dpg.get_value(HEATMAP_BACKGROUND_SELECTOR_TAG) or "")
+        selected_value = (
+            current_value if current_value in background_options else "Simulation Layout"
+        )
+        dpg.configure_item(
+            HEATMAP_BACKGROUND_SELECTOR_TAG,
+            items=background_options,
+            enabled=bool(background_options),
+        )
+        dpg.set_value(HEATMAP_BACKGROUND_SELECTOR_TAG, selected_value)
 
 
-def reset_heatmap_view() -> None:
-    _refresh_heatmap_store_options()
-    _set_heatmap_blank_frame()
-    _set_heatmap_status("Select a store and hour window, then render the heatmap.")
-    if dpg.does_item_exist(HEATMAP_START_HOUR_TAG):
-        dpg.set_value(HEATMAP_START_HOUR_TAG, _HEATMAP_HOUR_OPTIONS[0])
-    if dpg.does_item_exist(HEATMAP_END_HOUR_TAG):
-        dpg.set_value(HEATMAP_END_HOUR_TAG, _HEATMAP_END_HOUR_OPTIONS[-1])
-    if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+def _heatmap_empty_summary_rows(table_tag: str, empty_message: str) -> None:
+    if dpg.does_item_exist(table_tag):
         _populate_table_rows(
-            HEATMAP_SUMMARY_TABLE_TAG,
+            table_tag,
             [],
-            "Render a heatmap to see its summary.",
+            empty_message,
             2,
         )
 
 
-def refresh_heatmap_view() -> None:
+def _get_heatmap_request_snapshot() -> dict[str, object]:
     store_id = _get_selected_heatmap_store_id()
     start_hour = _get_selected_heatmap_hour(HEATMAP_START_HOUR_TAG)
     end_hour = _get_selected_heatmap_hour(HEATMAP_END_HOUR_TAG)
+    background_value = _get_selected_heatmap_background_value()
 
     if store_id is None:
-        _set_heatmap_blank_frame()
-        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
-            _populate_table_rows(
-                HEATMAP_SUMMARY_TABLE_TAG,
-                [],
-                "Render a heatmap to see its summary.",
-                2,
-            )
-        _set_heatmap_status("No store is available for heatmap rendering.")
-        return
+        raise ValueError("No store is available for heatmap rendering.")
     if start_hour is None or end_hour is None:
-        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
-            _populate_table_rows(
-                HEATMAP_SUMMARY_TABLE_TAG,
-                [],
-                "Render a heatmap to see its summary.",
-                2,
-            )
-        _set_heatmap_status("Choose a valid heatmap time window.")
-        return
+        raise ValueError("Choose a valid heatmap time window.")
     if start_hour >= end_hour:
-        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
-            _populate_table_rows(
-                HEATMAP_SUMMARY_TABLE_TAG,
-                [],
-                "Render a heatmap to see its summary.",
-                2,
-            )
-        _set_heatmap_status("End hour must be later than the start hour.")
-        return
+        raise ValueError("End hour must be later than the start hour.")
 
-    store, aisles, paths = heatmap_generator.get_store_heatmap_inputs(store_id)
+    return {
+        "store_id": store_id,
+        "start_hour": start_hour,
+        "end_hour": end_hour,
+        "background_value": background_value,
+    }
+
+def _build_heatmap_render_payload(
+    request: dict[str, object],
+    progress_callback=None,
+) -> dict[str, object]:
+    heatmap_generator._emit_progress(progress_callback, 0.02, "Loading store heatmap inputs...")
+    store, aisles, paths = heatmap_generator.get_store_heatmap_inputs(int(request["store_id"]))
     if store is None:
-        _set_heatmap_blank_frame()
-        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
-            _populate_table_rows(
-                HEATMAP_SUMMARY_TABLE_TAG,
-                [],
-                "Render a heatmap to see its summary.",
-                2,
-            )
-        _set_heatmap_status("Failed to load the selected store.")
-        return
+        raise ValueError("Failed to load the selected store.")
     if store.width <= 0 or store.height <= 0:
-        _set_heatmap_blank_frame()
-        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
-            _populate_table_rows(
-                HEATMAP_SUMMARY_TABLE_TAG,
-                [],
-                "Render a heatmap to see its summary.",
-                2,
-            )
-        _set_heatmap_status(
+        raise ValueError(
             f"{store.name} has invalid dimensions. Set store width and height first."
         )
-        return
 
+    heatmap_generator._emit_progress(
+        progress_callback,
+        0.12,
+        f"Loaded {len(paths):,} path points and {len(aisles):,} aisles for {store.name}.",
+    )
+    heatmap_generator._emit_progress(progress_callback, 0.18, "Preparing heatmap background...")
+    background_image_path, background_image_rgba, background_label = (
+        _get_heatmap_background_sources_for_value(
+            store,
+            aisles,
+            str(request["background_value"]),
+        )
+    )
+    start_hour = int(request["start_hour"])
+    end_hour = int(request["end_hour"])
     filtered_paths = heatmap_generator.filter_paths_by_time_range(paths, start_hour, end_hour)
     image_rgba = heatmap_generator.render_custom_heatmap_rgba(
         paths,
@@ -1211,24 +1398,506 @@ def refresh_heatmap_view() -> None:
         end_hour,
         width=HEATMAP_TEX_WIDTH,
         height=HEATMAP_TEX_HEIGHT,
+        background_image_path=background_image_path,
+        background_image_rgba=background_image_rgba,
+        progress_callback=lambda progress, status: heatmap_generator._emit_progress(
+            progress_callback,
+            0.20 + (0.78 * progress),
+            status,
+        ),
     )
-    _set_heatmap_image(image_rgba)
-    _populate_table_rows(
-        HEATMAP_SUMMARY_TABLE_TAG,
-        [
+    heatmap_generator._emit_progress(progress_callback, 1.0, "Heatmap render complete.")
+    return {
+        "image_rgba": image_rgba,
+        "summary_rows": [
             ["Store", f"{store.store_id}: {store.name}"],
             ["Hour Window", f"{start_hour:02d}:00 - {end_hour:02d}:00"],
+            ["Background", background_label],
             ["Store Size", f"{store.width} x {store.height}"],
             ["Aisles", str(len(aisles))],
             ["Total Paths", str(len(paths))],
             ["Filtered Paths", str(len(filtered_paths))],
         ],
+        "status": f"Rendered heatmap for {store.name} with {len(filtered_paths)} path points.",
+    }
+
+
+def _apply_heatmap_render_payload(payload: dict[str, object]) -> None:
+    _set_heatmap_image(payload["image_rgba"])
+    _populate_table_rows(
+        HEATMAP_SUMMARY_TABLE_TAG,
+        payload["summary_rows"],
         "Render a heatmap to see its summary.",
         2,
     )
-    _set_heatmap_status(
-        f"Rendered heatmap for {store.name} with {len(filtered_paths)} path points."
+    _set_heatmap_status(str(payload["status"]))
+
+
+def refresh_heatmap_view() -> None:
+    try:
+        payload = _build_heatmap_render_payload(_get_heatmap_request_snapshot())
+    except Exception as exc:
+        _set_heatmap_blank_frame()
+        _heatmap_empty_summary_rows(
+            HEATMAP_SUMMARY_TABLE_TAG,
+            "Render a heatmap to see its summary.",
+        )
+        _set_heatmap_status(str(exc))
+        return
+
+    _apply_heatmap_render_payload(payload)
+
+
+def _update_heatmap_render_state(progress: float, status: str) -> None:
+    with _HEATMAP_RENDER_LOCK:
+        _HEATMAP_STATIC_RENDER_STATE["progress"] = progress
+        _HEATMAP_STATIC_RENDER_STATE["status"] = status
+
+
+def _run_heatmap_render(request: dict[str, object]) -> None:
+    try:
+        payload = _build_heatmap_render_payload(
+            request,
+            progress_callback=_update_heatmap_render_state,
+        )
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_STATIC_RENDER_STATE["payload"] = payload
+            _HEATMAP_STATIC_RENDER_STATE["progress"] = 1.0
+            _HEATMAP_STATIC_RENDER_STATE["status"] = str(payload["status"])
+            _HEATMAP_STATIC_RENDER_STATE["completed"] = True
+            _HEATMAP_STATIC_RENDER_STATE["applied"] = False
+            _HEATMAP_STATIC_RENDER_STATE["is_rendering"] = False
+            _HEATMAP_STATIC_RENDER_STATE["thread"] = None
+    except Exception as exc:
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_STATIC_RENDER_STATE["payload"] = None
+            _HEATMAP_STATIC_RENDER_STATE["progress"] = 0.0
+            _HEATMAP_STATIC_RENDER_STATE["status"] = str(exc)
+            _HEATMAP_STATIC_RENDER_STATE["completed"] = True
+            _HEATMAP_STATIC_RENDER_STATE["applied"] = False
+            _HEATMAP_STATIC_RENDER_STATE["is_rendering"] = False
+            _HEATMAP_STATIC_RENDER_STATE["thread"] = None
+
+
+def _start_heatmap_render() -> None:
+    try:
+        request = _get_heatmap_request_snapshot()
+    except Exception as exc:
+        _set_heatmap_blank_frame()
+        _heatmap_empty_summary_rows(
+            HEATMAP_SUMMARY_TABLE_TAG,
+            "Render a heatmap to see its summary.",
+        )
+        _set_heatmap_status(str(exc))
+        return
+
+    with _HEATMAP_RENDER_LOCK:
+        if _HEATMAP_STATIC_RENDER_STATE["is_rendering"]:
+            return
+        _HEATMAP_STATIC_RENDER_STATE["thread"] = None
+        _HEATMAP_STATIC_RENDER_STATE["is_rendering"] = True
+        _HEATMAP_STATIC_RENDER_STATE["progress"] = 0.0
+        _HEATMAP_STATIC_RENDER_STATE["status"] = "Starting heatmap render..."
+        _HEATMAP_STATIC_RENDER_STATE["completed"] = False
+        _HEATMAP_STATIC_RENDER_STATE["applied"] = False
+        _HEATMAP_STATIC_RENDER_STATE["payload"] = None
+
+    thread = threading.Thread(target=_run_heatmap_render, args=(request,), daemon=True)
+    with _HEATMAP_RENDER_LOCK:
+        _HEATMAP_STATIC_RENDER_STATE["thread"] = thread
+    thread.start()
+
+
+def _poll_heatmap_render_state() -> None:
+    with _HEATMAP_RENDER_LOCK:
+        progress = float(_HEATMAP_STATIC_RENDER_STATE["progress"])
+        status = str(_HEATMAP_STATIC_RENDER_STATE["status"])
+        is_rendering = bool(_HEATMAP_STATIC_RENDER_STATE["is_rendering"])
+        completed = bool(_HEATMAP_STATIC_RENDER_STATE["completed"])
+        applied = bool(_HEATMAP_STATIC_RENDER_STATE["applied"])
+        payload = _HEATMAP_STATIC_RENDER_STATE["payload"]
+
+    if dpg.does_item_exist(HEATMAP_RENDER_BUTTON_TAG):
+        dpg.configure_item(HEATMAP_RENDER_BUTTON_TAG, enabled=not is_rendering)
+    if dpg.does_item_exist(HEATMAP_PROGRESS_TAG):
+        dpg.set_value(HEATMAP_PROGRESS_TAG, progress)
+        dpg.configure_item(HEATMAP_PROGRESS_TAG, overlay=f"{progress * 100:.0f}%")
+    _set_heatmap_status(status)
+
+    if completed and not applied and payload is not None:
+        _apply_heatmap_render_payload(payload)
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_STATIC_RENDER_STATE["completed"] = False
+            _HEATMAP_STATIC_RENDER_STATE["applied"] = True
+            _HEATMAP_STATIC_RENDER_STATE["payload"] = None
+    elif completed and not applied and payload is None:
+        _set_heatmap_blank_frame()
+        _heatmap_empty_summary_rows(
+            HEATMAP_SUMMARY_TABLE_TAG,
+            "Render a heatmap to see its summary.",
+        )
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_STATIC_RENDER_STATE["completed"] = False
+            _HEATMAP_STATIC_RENDER_STATE["applied"] = True
+
+
+def _get_heatmap_video_output_path(store_id: int, start_hour: int, end_hour: int) -> str:
+    safe_name = f"heatmap_evolution_store_{store_id}_{start_hour:02d}_{end_hour:02d}.mp4"
+    return os.path.join(Singleton().get_tempFolderPictures(), safe_name)
+
+
+def _build_heatmap_video_request(
+    request_snapshot: dict[str, object],
+) -> dict[str, object]:
+    store, aisles, paths = heatmap_generator.get_store_heatmap_inputs(
+        int(request_snapshot["store_id"])
     )
+    if store is None:
+        raise ValueError("Failed to load the selected store.")
+    if store.width <= 0 or store.height <= 0:
+        raise ValueError(
+            f"{store.name} has invalid dimensions. Set store width and height first."
+        )
+
+    background_image_path, background_image_rgba, background_label = (
+        _get_heatmap_background_sources_for_value(
+            store,
+            aisles,
+            str(request_snapshot["background_value"]),
+        )
+    )
+    start_hour = int(request_snapshot["start_hour"])
+    end_hour = int(request_snapshot["end_hour"])
+    return {
+        "store": store,
+        "aisles": aisles,
+        "paths": paths,
+        "start_hour": start_hour,
+        "end_hour": end_hour,
+        "background_image_path": background_image_path,
+        "background_image_rgba": background_image_rgba,
+        "background_label": background_label,
+        "output_path": _get_heatmap_video_output_path(store.store_id, start_hour, end_hour),
+    }
+
+
+def _update_heatmap_video_render_state(progress: float, status: str) -> None:
+    with _HEATMAP_RENDER_LOCK:
+        _HEATMAP_VIDEO_RENDER_STATE["progress"] = progress
+        _HEATMAP_VIDEO_RENDER_STATE["status"] = status
+
+
+def _run_heatmap_video_render(request_snapshot: dict[str, object]) -> None:
+    try:
+        request = _build_heatmap_video_request(request_snapshot)
+        result = heatmap_generator.render_heatmap_video(
+            request["paths"],
+            request["aisles"],
+            request["store"],
+            request["start_hour"],
+            request["end_hour"],
+            request["output_path"],
+            width=HEATMAP_VIDEO_TEX_WIDTH,
+            height=HEATMAP_VIDEO_TEX_HEIGHT,
+            fps=_HEATMAP_VIDEO_FPS,
+            minute_step=1,
+            persistence_frames=_HEATMAP_VIDEO_PERSISTENCE_FRAMES,
+            background_image_path=request["background_image_path"],
+            background_image_rgba=request["background_image_rgba"],
+            progress_callback=_update_heatmap_video_render_state,
+        )
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_VIDEO_RENDER_STATE["result"] = {
+                "render_result": result,
+                "request": request,
+            }
+            _HEATMAP_VIDEO_RENDER_STATE["progress"] = 1.0
+            _HEATMAP_VIDEO_RENDER_STATE["status"] = (
+                f"Heatmap video render complete. Saved to {result.output_path}"
+            )
+            _HEATMAP_VIDEO_RENDER_STATE["completed"] = True
+            _HEATMAP_VIDEO_RENDER_STATE["logged_done"] = False
+            _HEATMAP_VIDEO_RENDER_STATE["is_rendering"] = False
+            _HEATMAP_VIDEO_RENDER_STATE["thread"] = None
+    except Exception as exc:
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_VIDEO_RENDER_STATE["result"] = None
+            _HEATMAP_VIDEO_RENDER_STATE["progress"] = 0.0
+            _HEATMAP_VIDEO_RENDER_STATE["status"] = f"Heatmap video render failed: {exc}"
+            _HEATMAP_VIDEO_RENDER_STATE["completed"] = True
+            _HEATMAP_VIDEO_RENDER_STATE["logged_done"] = False
+            _HEATMAP_VIDEO_RENDER_STATE["is_rendering"] = False
+            _HEATMAP_VIDEO_RENDER_STATE["thread"] = None
+
+
+def _release_heatmap_video_capture() -> None:
+    global _HEATMAP_VIDEO_CAPTURE, _HEATMAP_VIDEO_PATH
+    if _HEATMAP_VIDEO_CAPTURE is not None:
+        _HEATMAP_VIDEO_CAPTURE.release()
+    _HEATMAP_VIDEO_CAPTURE = None
+    _HEATMAP_VIDEO_PATH = None
+
+
+def _load_heatmap_video_capture(video_path: str) -> bool:
+    global _HEATMAP_VIDEO_CAPTURE, _HEATMAP_VIDEO_PATH
+    global _HEATMAP_VIDEO_FRAME_COUNT
+    if (
+        _HEATMAP_VIDEO_CAPTURE is not None
+        and _HEATMAP_VIDEO_PATH == video_path
+        and _HEATMAP_VIDEO_CAPTURE.isOpened()
+    ):
+        return True
+
+    _release_heatmap_video_capture()
+    capture = cv2.VideoCapture(video_path)
+    if not capture.isOpened():
+        return False
+
+    _HEATMAP_VIDEO_CAPTURE = capture
+    _HEATMAP_VIDEO_PATH = video_path
+    _HEATMAP_VIDEO_FRAME_COUNT = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    return True
+
+
+def _display_heatmap_video_first_frame() -> bool:
+    global _HEATMAP_VIDEO_CURRENT_FRAME, _HEATMAP_VIDEO_LAST_FRAME_TIME
+    with _HEATMAP_RENDER_LOCK:
+        result_bundle = _HEATMAP_VIDEO_RENDER_STATE["result"]
+    if not result_bundle:
+        _release_heatmap_video_capture()
+        _set_heatmap_video_blank_frame()
+        _set_heatmap_video_status("No rendered heatmap video found yet.")
+        return False
+
+    output_path = result_bundle["render_result"].output_path
+    if not os.path.exists(output_path):
+        _release_heatmap_video_capture()
+        _set_heatmap_video_blank_frame()
+        _set_heatmap_video_status("No rendered heatmap video found yet.")
+        return False
+
+    if not _load_heatmap_video_capture(output_path):
+        _release_heatmap_video_capture()
+        _set_heatmap_video_blank_frame()
+        _set_heatmap_video_status("Failed to open the rendered heatmap video.")
+        return False
+
+    assert _HEATMAP_VIDEO_CAPTURE is not None
+    _HEATMAP_VIDEO_CAPTURE.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    success, frame = _HEATMAP_VIDEO_CAPTURE.read()
+    if not success:
+        _release_heatmap_video_capture()
+        _set_heatmap_video_blank_frame()
+        _set_heatmap_video_status("Failed to read the first heatmap video frame.")
+        return False
+
+    _set_heatmap_video_frame(frame)
+    _HEATMAP_VIDEO_CURRENT_FRAME = 1
+    _HEATMAP_VIDEO_LAST_FRAME_TIME = time.monotonic()
+    _set_heatmap_video_status(
+        f"Loaded heatmap video frame 1/{max(_HEATMAP_VIDEO_FRAME_COUNT, 1)}."
+    )
+    return True
+
+
+def _set_heatmap_video_playback_button_state() -> None:
+    with _HEATMAP_RENDER_LOCK:
+        is_rendering = bool(_HEATMAP_VIDEO_RENDER_STATE["is_rendering"])
+        result_bundle = _HEATMAP_VIDEO_RENDER_STATE["result"]
+    has_video = bool(
+        result_bundle and os.path.exists(result_bundle["render_result"].output_path)
+    )
+    if dpg.does_item_exist(HEATMAP_VIDEO_PLAY_BUTTON_TAG):
+        dpg.configure_item(
+            HEATMAP_VIDEO_PLAY_BUTTON_TAG,
+            enabled=has_video and not is_rendering,
+        )
+    if dpg.does_item_exist(HEATMAP_VIDEO_PAUSE_BUTTON_TAG):
+        dpg.configure_item(
+            HEATMAP_VIDEO_PAUSE_BUTTON_TAG,
+            enabled=_HEATMAP_VIDEO_PLAYING,
+        )
+    if dpg.does_item_exist(HEATMAP_VIDEO_RESTART_BUTTON_TAG):
+        dpg.configure_item(
+            HEATMAP_VIDEO_RESTART_BUTTON_TAG,
+            enabled=has_video and not is_rendering,
+        )
+    if dpg.does_item_exist(HEATMAP_VIDEO_RENDER_BUTTON_TAG):
+        dpg.configure_item(
+            HEATMAP_VIDEO_RENDER_BUTTON_TAG,
+            enabled=not is_rendering and bool(_HEATMAP_STORE_LABEL_TO_ID),
+        )
+
+
+def _heatmap_video_tick() -> None:
+    global _HEATMAP_VIDEO_PLAYING, _HEATMAP_VIDEO_LAST_FRAME_TIME, _HEATMAP_VIDEO_CURRENT_FRAME
+    if not _HEATMAP_VIDEO_PLAYING:
+        _set_heatmap_video_playback_button_state()
+        return
+
+    if _HEATMAP_VIDEO_CAPTURE is None or not _HEATMAP_VIDEO_CAPTURE.isOpened():
+        _HEATMAP_VIDEO_PLAYING = False
+        _set_heatmap_video_status("Heatmap video playback stopped; no video is loaded.")
+        _set_heatmap_video_playback_button_state()
+        return
+
+    now = time.monotonic()
+    frame_interval = 1.0 / max(_HEATMAP_VIDEO_FPS, 1.0)
+    if now - _HEATMAP_VIDEO_LAST_FRAME_TIME < frame_interval:
+        return
+
+    success, frame = _HEATMAP_VIDEO_CAPTURE.read()
+    if not success:
+        _HEATMAP_VIDEO_PLAYING = False
+        _set_heatmap_video_status("Heatmap video playback finished.")
+        _set_heatmap_video_playback_button_state()
+        return
+
+    _set_heatmap_video_frame(frame)
+    _HEATMAP_VIDEO_LAST_FRAME_TIME = now
+    _HEATMAP_VIDEO_CURRENT_FRAME = int(
+        _HEATMAP_VIDEO_CAPTURE.get(cv2.CAP_PROP_POS_FRAMES) or 0
+    )
+    _set_heatmap_video_status(
+        f"Playing heatmap video frame {_HEATMAP_VIDEO_CURRENT_FRAME}/{max(_HEATMAP_VIDEO_FRAME_COUNT, 1)}."
+    )
+    _set_heatmap_video_playback_button_state()
+
+
+def _poll_heatmap_video_render_state() -> None:
+    with _HEATMAP_RENDER_LOCK:
+        progress = float(_HEATMAP_VIDEO_RENDER_STATE["progress"])
+        status = str(_HEATMAP_VIDEO_RENDER_STATE["status"])
+        is_rendering = bool(_HEATMAP_VIDEO_RENDER_STATE["is_rendering"])
+        completed = bool(_HEATMAP_VIDEO_RENDER_STATE["completed"])
+        logged_done = bool(_HEATMAP_VIDEO_RENDER_STATE["logged_done"])
+        result_bundle = _HEATMAP_VIDEO_RENDER_STATE["result"]
+
+    if dpg.does_item_exist(HEATMAP_VIDEO_PROGRESS_TAG):
+        dpg.set_value(HEATMAP_VIDEO_PROGRESS_TAG, progress)
+        dpg.configure_item(HEATMAP_VIDEO_PROGRESS_TAG, overlay=f"{progress * 100:.0f}%")
+    _set_heatmap_video_status(status)
+    _set_heatmap_video_playback_button_state()
+
+    if completed and not logged_done:
+        if result_bundle is not None:
+            render_result = result_bundle["render_result"]
+            request = result_bundle["request"]
+            _populate_table_rows(
+                HEATMAP_VIDEO_SUMMARY_TABLE_TAG,
+                [
+                    ["Store", f"{request['store'].store_id}: {request['store'].name}"],
+                    ["Hour Window", f"{request['start_hour']:02d}:00 - {request['end_hour']:02d}:00"],
+                    ["Background", request["background_label"]],
+                    ["Output Path", render_result.output_path],
+                    ["Frames", str(render_result.num_frames)],
+                    ["FPS", str(_HEATMAP_VIDEO_FPS)],
+                    ["Duration", f"{render_result.video_seconds:.2f}s"],
+                    ["Filtered Paths", str(render_result.filtered_paths)],
+                    ["Minute Step", f"{render_result.minute_step} minute"],
+                    [
+                        "Persistence",
+                        f"{render_result.persistence_frames} frames (~{render_result.persistence_frames * render_result.minute_step} min)",
+                    ],
+                ],
+                "Render a heatmap video to see its summary.",
+                2,
+            )
+            _display_heatmap_video_first_frame()
+            logWindow.addLog(0, f"Heatmap video rendered to {render_result.output_path}")
+        else:
+            _heatmap_empty_summary_rows(
+                HEATMAP_VIDEO_SUMMARY_TABLE_TAG,
+                "Render a heatmap video to see its summary.",
+            )
+            _set_heatmap_video_blank_frame()
+            logWindow.addLog(2, status)
+        with _HEATMAP_RENDER_LOCK:
+            _HEATMAP_VIDEO_RENDER_STATE["logged_done"] = True
+
+
+def _start_heatmap_video_render() -> None:
+    global _HEATMAP_VIDEO_PLAYING
+    try:
+        request_snapshot = _get_heatmap_request_snapshot()
+    except Exception as exc:
+        _heatmap_empty_summary_rows(
+            HEATMAP_VIDEO_SUMMARY_TABLE_TAG,
+            "Render a heatmap video to see its summary.",
+        )
+        _set_heatmap_video_blank_frame()
+        _set_heatmap_video_status(str(exc))
+        return
+
+    with _HEATMAP_RENDER_LOCK:
+        if _HEATMAP_VIDEO_RENDER_STATE["is_rendering"]:
+            return
+        _HEATMAP_VIDEO_RENDER_STATE["thread"] = None
+        _HEATMAP_VIDEO_RENDER_STATE["is_rendering"] = True
+        _HEATMAP_VIDEO_RENDER_STATE["progress"] = 0.0
+        _HEATMAP_VIDEO_RENDER_STATE["status"] = "Starting heatmap video render..."
+        _HEATMAP_VIDEO_RENDER_STATE["completed"] = False
+        _HEATMAP_VIDEO_RENDER_STATE["logged_done"] = False
+        _HEATMAP_VIDEO_RENDER_STATE["result"] = None
+
+    _HEATMAP_VIDEO_PLAYING = False
+    _release_heatmap_video_capture()
+    _set_heatmap_video_blank_frame()
+    thread = threading.Thread(
+        target=_run_heatmap_video_render,
+        args=(request_snapshot,),
+        daemon=True,
+    )
+    with _HEATMAP_RENDER_LOCK:
+        _HEATMAP_VIDEO_RENDER_STATE["thread"] = thread
+    thread.start()
+
+
+def reset_heatmap_view() -> None:
+    global _HEATMAP_VIDEO_PLAYING
+    _refresh_heatmap_store_options()
+    _set_heatmap_blank_frame()
+    _set_heatmap_status("Select a store, background, and hour window, then render the heatmap.")
+    _set_heatmap_video_blank_frame()
+    _set_heatmap_video_status("Render a heatmap video to preview it here.")
+    if dpg.does_item_exist(HEATMAP_START_HOUR_TAG):
+        dpg.set_value(HEATMAP_START_HOUR_TAG, _HEATMAP_HOUR_OPTIONS[0])
+    if dpg.does_item_exist(HEATMAP_END_HOUR_TAG):
+        dpg.set_value(HEATMAP_END_HOUR_TAG, _HEATMAP_END_HOUR_OPTIONS[-1])
+    if dpg.does_item_exist(HEATMAP_BACKGROUND_SELECTOR_TAG):
+        dpg.set_value(HEATMAP_BACKGROUND_SELECTOR_TAG, "Simulation Layout")
+    if dpg.does_item_exist(HEATMAP_PROGRESS_TAG):
+        dpg.set_value(HEATMAP_PROGRESS_TAG, 0.0)
+        dpg.configure_item(HEATMAP_PROGRESS_TAG, overlay="0%")
+    if dpg.does_item_exist(HEATMAP_VIDEO_PROGRESS_TAG):
+        dpg.set_value(HEATMAP_VIDEO_PROGRESS_TAG, 0.0)
+        dpg.configure_item(HEATMAP_VIDEO_PROGRESS_TAG, overlay="0%")
+    _heatmap_empty_summary_rows(
+        HEATMAP_SUMMARY_TABLE_TAG,
+        "Render a heatmap to see its summary.",
+    )
+    _heatmap_empty_summary_rows(
+        HEATMAP_VIDEO_SUMMARY_TABLE_TAG,
+        "Render a heatmap video to see its summary.",
+    )
+    with _HEATMAP_RENDER_LOCK:
+        _HEATMAP_STATIC_RENDER_STATE["thread"] = None
+        _HEATMAP_STATIC_RENDER_STATE["is_rendering"] = False
+        _HEATMAP_STATIC_RENDER_STATE["progress"] = 0.0
+        _HEATMAP_STATIC_RENDER_STATE["status"] = "Ready to render a heatmap."
+        _HEATMAP_STATIC_RENDER_STATE["completed"] = False
+        _HEATMAP_STATIC_RENDER_STATE["applied"] = False
+        _HEATMAP_STATIC_RENDER_STATE["payload"] = None
+        _HEATMAP_VIDEO_RENDER_STATE["thread"] = None
+        _HEATMAP_VIDEO_RENDER_STATE["is_rendering"] = False
+        _HEATMAP_VIDEO_RENDER_STATE["progress"] = 0.0
+        _HEATMAP_VIDEO_RENDER_STATE["status"] = "Ready to render a heatmap video."
+        _HEATMAP_VIDEO_RENDER_STATE["completed"] = False
+        _HEATMAP_VIDEO_RENDER_STATE["logged_done"] = False
+        _HEATMAP_VIDEO_RENDER_STATE["result"] = None
+    _HEATMAP_VIDEO_PLAYING = False
+    _release_heatmap_video_capture()
+    _set_heatmap_video_playback_button_state()
 
 
 def _format_currency(amount: float) -> str:
@@ -2192,7 +2861,49 @@ def callback_refresh_simulation_info(sender, app_data, user_data):
 
 
 def callback_render_heatmap(sender, app_data, user_data):
-    refresh_heatmap_view()
+    _start_heatmap_render()
+
+
+def callback_render_heatmap_video(sender, app_data, user_data):
+    _start_heatmap_video_render()
+
+
+def callback_play_heatmap_video(sender, app_data, user_data):
+    global _HEATMAP_VIDEO_PLAYING, _HEATMAP_VIDEO_LAST_FRAME_TIME
+    with _HEATMAP_RENDER_LOCK:
+        is_rendering = bool(_HEATMAP_VIDEO_RENDER_STATE["is_rendering"])
+    if is_rendering:
+        display_modal_popup(2, "Wait for the heatmap video render to finish first.")
+        return
+
+    if _HEATMAP_VIDEO_CAPTURE is None or not _HEATMAP_VIDEO_CAPTURE.isOpened():
+        if not _display_heatmap_video_first_frame():
+            display_modal_popup(2, "No rendered heatmap video is available yet.")
+            return
+    elif _HEATMAP_VIDEO_FRAME_COUNT and _HEATMAP_VIDEO_CURRENT_FRAME >= _HEATMAP_VIDEO_FRAME_COUNT:
+        if not _display_heatmap_video_first_frame():
+            display_modal_popup(2, "No rendered heatmap video is available yet.")
+            return
+
+    _HEATMAP_VIDEO_PLAYING = True
+    _HEATMAP_VIDEO_LAST_FRAME_TIME = 0.0
+    _set_heatmap_video_status("Playing heatmap video...")
+    _set_heatmap_video_playback_button_state()
+
+
+def callback_pause_heatmap_video(sender, app_data, user_data):
+    global _HEATMAP_VIDEO_PLAYING
+    _HEATMAP_VIDEO_PLAYING = False
+    _set_heatmap_video_status("Heatmap video playback paused.")
+    _set_heatmap_video_playback_button_state()
+
+
+def callback_restart_heatmap_video(sender, app_data, user_data):
+    global _HEATMAP_VIDEO_PLAYING
+    _HEATMAP_VIDEO_PLAYING = False
+    if not _display_heatmap_video_first_frame():
+        display_modal_popup(2, "No rendered heatmap video is available yet.")
+    _set_heatmap_video_playback_button_state()
 
 
 def callback_render_simulation(sender, app_data, user_data):
@@ -2278,6 +2989,25 @@ def pump_analytics_view() -> None:
         _poll_analytics_refresh_state(key)
 
 
+def pump_heatmap_view() -> None:
+    with _HEATMAP_RENDER_LOCK:
+        static_is_rendering = bool(_HEATMAP_STATIC_RENDER_STATE["is_rendering"])
+        static_completed = bool(_HEATMAP_STATIC_RENDER_STATE["completed"])
+        static_applied = bool(_HEATMAP_STATIC_RENDER_STATE["applied"])
+        video_is_rendering = bool(_HEATMAP_VIDEO_RENDER_STATE["is_rendering"])
+        video_completed = bool(_HEATMAP_VIDEO_RENDER_STATE["completed"])
+        video_logged_done = bool(_HEATMAP_VIDEO_RENDER_STATE["logged_done"])
+
+    if static_is_rendering or (static_completed and not static_applied):
+        _poll_heatmap_render_state()
+    if video_is_rendering or (video_completed and not video_logged_done):
+        _poll_heatmap_video_render_state()
+    if _HEATMAP_VIDEO_PLAYING:
+        _heatmap_video_tick()
+    else:
+        _set_heatmap_video_playback_button_state()
+
+
 def pump_simulation_view() -> None:
     with _SIMULATION_RENDER_LOCK:
         is_rendering = _SIMULATION_RENDER_STATE["is_rendering"]
@@ -2297,6 +3027,7 @@ def callback_graph_view_changed(sender, app_data, user_data):
         _ensure_selected_analytics_subtab_loaded()
     elif selected_tab == GRAPH_HEATMAP_TAB_TAG:
         _refresh_heatmap_store_options()
+        _set_heatmap_video_playback_button_state()
     elif selected_tab == GRAPH_REVENUE_TAB_TAG:
         if not _REVENUE_ANALYTICS_LOADED:
             refresh_revenue_analytics_view()
@@ -2638,9 +3369,10 @@ def create_simulation_view(parent: str) -> None:
 
 def create_heatmap_view(parent: str) -> None:
     _ensure_heatmap_texture()
+    _ensure_heatmap_video_texture()
     with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
         dpg.add_text(
-            "Render a customer-density heatmap using the existing heatmap generator."
+            "Render customer-density heatmaps and minute-by-minute heatmap videos."
         )
         with dpg.group(horizontal=True):
             dpg.add_combo(
@@ -2649,6 +3381,13 @@ def create_heatmap_view(parent: str) -> None:
                 tag=HEATMAP_STORE_SELECTOR_TAG,
                 label="Store",
                 width=220,
+            )
+            dpg.add_combo(
+                items=[],
+                default_value="Simulation Layout",
+                tag=HEATMAP_BACKGROUND_SELECTOR_TAG,
+                label="Background",
+                width=240,
             )
             dpg.add_combo(
                 items=_HEATMAP_HOUR_OPTIONS,
@@ -2664,33 +3403,97 @@ def create_heatmap_view(parent: str) -> None:
                 label="End Hour",
                 width=120,
             )
-            dpg.add_button(
-                label="Render Heatmap",
-                tag=HEATMAP_RENDER_BUTTON_TAG,
-                callback=callback_render_heatmap,
-            )
-        dpg.add_text(
-            "Select a store and hour window, then render the heatmap.",
-            tag=HEATMAP_STATUS_TAG,
-            wrap=900,
-        )
-        with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
-            dpg.add_table_column(init_width_or_weight=0.38)
-            dpg.add_table_column()
-            with dpg.table_row():
-                with dpg.table_cell() as summary_cell:
-                    _add_stretch_table(
-                        HEATMAP_SUMMARY_TABLE_TAG,
-                        ["Property", "Value"],
-                        summary_cell,
+        dpg.add_spacer(height=6)
+        with dpg.tab_bar(tag=HEATMAP_TAB_BAR_TAG):
+            with dpg.tab(label="Static Heatmap", tag=HEATMAP_STATIC_TAB_TAG):
+                with dpg.group(horizontal=True):
+                    dpg.add_button(
+                        label="Render Heatmap",
+                        tag=HEATMAP_RENDER_BUTTON_TAG,
+                        callback=callback_render_heatmap,
                     )
-                with dpg.table_cell():
-                    dpg.add_image(
-                        HEATMAP_TEXTURE_TAG,
-                        tag=HEATMAP_IMAGE_TAG,
-                        width=HEATMAP_TEX_WIDTH,
-                        height=HEATMAP_TEX_HEIGHT,
+                    dpg.add_text("Uses the shared store, background, and hour window above.")
+                dpg.add_progress_bar(
+                    default_value=0.0,
+                    overlay="0%",
+                    width=-1,
+                    tag=HEATMAP_PROGRESS_TAG,
+                )
+                dpg.add_text(
+                    "Select a store, background, and hour window, then render the heatmap.",
+                    tag=HEATMAP_STATUS_TAG,
+                    wrap=900,
+                )
+                with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
+                    dpg.add_table_column(init_width_or_weight=0.38)
+                    dpg.add_table_column()
+                    with dpg.table_row():
+                        with dpg.table_cell() as summary_cell:
+                            _add_stretch_table(
+                                HEATMAP_SUMMARY_TABLE_TAG,
+                                ["Property", "Value"],
+                                summary_cell,
+                            )
+                        with dpg.table_cell():
+                            dpg.add_image(
+                                HEATMAP_TEXTURE_TAG,
+                                tag=HEATMAP_IMAGE_TAG,
+                                width=HEATMAP_TEX_WIDTH,
+                                height=HEATMAP_TEX_HEIGHT,
+                            )
+
+            with dpg.tab(label="Heatmap Video", tag=HEATMAP_VIDEO_TAB_TAG):
+                with dpg.group(horizontal=True):
+                    dpg.add_button(
+                        label="Render Heatmap Video",
+                        tag=HEATMAP_VIDEO_RENDER_BUTTON_TAG,
+                        callback=callback_render_heatmap_video,
                     )
+                    dpg.add_text("Generates one frame per minute across the selected hour window.")
+                dpg.add_progress_bar(
+                    default_value=0.0,
+                    overlay="0%",
+                    width=-1,
+                    tag=HEATMAP_VIDEO_PROGRESS_TAG,
+                )
+                dpg.add_text(
+                    "Render a heatmap video to preview it here.",
+                    tag=HEATMAP_VIDEO_STATUS_TAG,
+                    wrap=900,
+                )
+                with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
+                    dpg.add_table_column(init_width_or_weight=0.38)
+                    dpg.add_table_column()
+                    with dpg.table_row():
+                        with dpg.table_cell() as video_summary_cell:
+                            _add_stretch_table(
+                                HEATMAP_VIDEO_SUMMARY_TABLE_TAG,
+                                ["Property", "Value"],
+                                video_summary_cell,
+                            )
+                        with dpg.table_cell():
+                            with dpg.group(horizontal=True):
+                                dpg.add_button(
+                                    label="Play",
+                                    tag=HEATMAP_VIDEO_PLAY_BUTTON_TAG,
+                                    callback=callback_play_heatmap_video,
+                                )
+                                dpg.add_button(
+                                    label="Pause",
+                                    tag=HEATMAP_VIDEO_PAUSE_BUTTON_TAG,
+                                    callback=callback_pause_heatmap_video,
+                                )
+                                dpg.add_button(
+                                    label="Restart",
+                                    tag=HEATMAP_VIDEO_RESTART_BUTTON_TAG,
+                                    callback=callback_restart_heatmap_video,
+                                )
+                            dpg.add_image(
+                                HEATMAP_VIDEO_TEXTURE_TAG,
+                                tag=HEATMAP_VIDEO_IMAGE_TAG,
+                                width=HEATMAP_VIDEO_TEX_WIDTH,
+                                height=HEATMAP_VIDEO_TEX_HEIGHT,
+                            )
 
     reset_heatmap_view()
 
