@@ -33,6 +33,9 @@ ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG = "analytics_customer_attributes_tab"
 ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG = "analytics_customer_product_tab"
 ANALYTICS_SECTION_TIME_TAB_TAG = "analytics_section_time_tab"
 ANALYTICS_BASKET_TAB_TAG = "analytics_basket_tab"
+CUSTOMER_PRODUCT_ANALYSIS_TAB_BAR_TAG = "customer_product_analysis_tab_bar"
+CUSTOMER_PRODUCT_GENDER_TAB_TAG = "customer_product_gender_tab"
+CUSTOMER_PRODUCT_AGE_TAB_TAG = "customer_product_age_tab"
 BASKET_ANALYSIS_TAB_BAR_TAG = "basket_analysis_tab_bar"
 BASKET_SUMMARY_TAB_TAG = "basket_summary_tab"
 BASKET_PRODUCTS_TAB_TAG = "basket_products_tab"
@@ -1526,19 +1529,28 @@ def create_analytics_data_view(parent: str) -> None:
                     "Refresh this product-level analysis only.",
                 )
                 dpg.add_spacer(height=6)
-                dpg.add_text("Most common customer gender by product")
-                _add_stretch_table(
-                    CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
-                    ["Product", "Most Common Gender"],
-                    ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
-                )
-                dpg.add_spacer(height=6)
-                dpg.add_text("Most common customer age by product")
-                _add_stretch_table(
-                    CUSTOMER_PRODUCT_AGE_TABLE_TAG,
-                    ["Product", "Most Common Age"],
-                    ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
-                )
+                with dpg.tab_bar(tag=CUSTOMER_PRODUCT_ANALYSIS_TAB_BAR_TAG):
+                    with dpg.tab(
+                        label="Most Common Gender",
+                        tag=CUSTOMER_PRODUCT_GENDER_TAB_TAG,
+                    ):
+                        dpg.add_text("Most common customer gender by product")
+                        _add_stretch_table(
+                            CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
+                            ["Product", "Most Common Gender"],
+                            CUSTOMER_PRODUCT_GENDER_TAB_TAG,
+                        )
+
+                    with dpg.tab(
+                        label="Most Common Age",
+                        tag=CUSTOMER_PRODUCT_AGE_TAB_TAG,
+                    ):
+                        dpg.add_text("Most common customer age by product")
+                        _add_stretch_table(
+                            CUSTOMER_PRODUCT_AGE_TABLE_TAG,
+                            ["Product", "Most Common Age"],
+                            CUSTOMER_PRODUCT_AGE_TAB_TAG,
+                        )
 
             with dpg.tab(
                 label="sectionTimeAnalysis.py",
