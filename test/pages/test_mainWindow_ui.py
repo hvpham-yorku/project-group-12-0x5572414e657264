@@ -32,6 +32,15 @@ class TestMainWindowUI(GuiDbTestCase):
             dpg.does_item_exist(dataAnalyticsWindow.ANALYTICS_CUSTOMER_AISLE_TAB_TAG)
         )
         self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_AISLE_ANALYSIS_TAB_BAR_TAG)
+        )
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_AISLE_GENDER_TAB_TAG)
+        )
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_AISLE_AGE_TAB_TAG)
+        )
+        self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG)
         )
         self.assertTrue(
