@@ -25,9 +25,30 @@ class TestMainWindowUI(GuiDbTestCase):
 
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_VIEW_TAB_BAR_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_PIE_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_HEATMAP_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_ANALYTICS_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_REVENUE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.GRAPH_SIMULATION_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_STORE_SELECTOR_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_BACKGROUND_SELECTOR_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_START_HOUR_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_END_HOUR_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_TAB_BAR_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_STATIC_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_RENDER_BUTTON_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_PROGRESS_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_STATUS_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_SUMMARY_TABLE_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_IMAGE_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_RENDER_BUTTON_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_PROGRESS_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_STATUS_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_SUMMARY_TABLE_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_IMAGE_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_PLAY_BUTTON_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_PAUSE_BUTTON_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.HEATMAP_VIDEO_RESTART_BUTTON_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.ANALYTICS_DATA_TAB_BAR_TAG))
         self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.ANALYTICS_CUSTOMER_AISLE_TAB_TAG)
@@ -276,6 +297,68 @@ class TestMainWindowUI(GuiDbTestCase):
             ],
             basket_pair_rows,
         )
+
+    def test_graph_panel_renders_heatmap_from_customer_paths(self):
+        store = mm.add_store(
+            Store(name="Store A", owner="Owner A", width=20, height=12)
+        )
+        mm.add_aisle(
+            Aisle(
+                store_id=store.store_id,
+                bottom_left_x=6,
+                bottom_left_y=2,
+                top_right_x=10,
+                top_right_y=9,
+                vertical=True,
+            )
+        )
+        customer = mm.add_customer(
+            Customer(store_id=store.store_id, age="25-32", sex="Female")
+        )
+        mm.add_path(
+            Path(
+                customer_id=customer.customer_id,
+                location_x=3,
+                location_y=4,
+                timestamp=datetime(2026, 1, 1, 9, 5, 0),
+            )
+        )
+        mm.add_path(
+            Path(
+                customer_id=customer.customer_id,
+                location_x=3,
+                location_y=4,
+                timestamp=datetime(2026, 1, 1, 9, 10, 0),
+            )
+        )
+        mm.add_path(
+            Path(
+                customer_id=customer.customer_id,
+                location_x=12,
+                location_y=7,
+                timestamp=datetime(2026, 1, 1, 10, 15, 0),
+            )
+        )
+
+        mainWindow.mainWindow("main_window")
+        dpg.set_value(dataAnalyticsWindow.HEATMAP_START_HOUR_TAG, "09:00")
+        dpg.set_value(dataAnalyticsWindow.HEATMAP_END_HOUR_TAG, "11:00")
+        dpg.set_value(dataAnalyticsWindow.HEATMAP_BACKGROUND_SELECTOR_TAG, "Simulation Layout")
+        dataAnalyticsWindow.refresh_heatmap_view()
+
+        heatmap_summary_rows = _get_row_values(dataAnalyticsWindow.HEATMAP_SUMMARY_TABLE_TAG)
+        heatmap_status = dpg.get_value(dataAnalyticsWindow.HEATMAP_STATUS_TAG)
+
+        self.assertIn(["Background", "Simulation Layout"], heatmap_summary_rows)
+        self.assertIn(["Store Size", "20 x 12"], heatmap_summary_rows)
+        self.assertIn(["Aisles", "1"], heatmap_summary_rows)
+        self.assertIn(["Total Paths", "3"], heatmap_summary_rows)
+        self.assertIn(["Filtered Paths", "3"], heatmap_summary_rows)
+        self.assertEqual(
+            dpg.get_value(dataAnalyticsWindow.HEATMAP_STORE_SELECTOR_TAG),
+            f"{store.store_id}: {store.name}",
+        )
+        self.assertIn("Rendered heatmap for Store A", heatmap_status)
 
     def test_graph_panel_populates_revenue_analytics_tables(self):
         store = mm.add_store(Store(name="Store A", owner="Owner A"))
