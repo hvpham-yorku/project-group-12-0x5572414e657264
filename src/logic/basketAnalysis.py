@@ -19,6 +19,7 @@ from src.database import model_managers
 @dataclass
 class ProductSummary:
     """Aggregate purchase statistics for a single product."""
+
     product_id: int
     product_name: str
     total_quantity_sold: int
@@ -29,6 +30,7 @@ class ProductSummary:
 @dataclass
 class ProductPairAssociation:
     """Association-rule metrics for a pair of products bought together."""
+
     product_a_id: int
     product_a_name: str
     product_b_id: int
@@ -43,6 +45,7 @@ class ProductPairAssociation:
 @dataclass
 class BasketSummary:
     """Store-wide transaction statistics."""
+
     total_transactions: int
     total_revenue: float
     average_basket_size: float
@@ -53,9 +56,12 @@ class BasketSummary:
 @dataclass
 class BasketAnalysis:
     """Top-level container for market basket analysis results."""
+
     basket_summary: BasketSummary
     product_summaries: List[ProductSummary] = field(default_factory=list)
-    product_pair_associations: List[ProductPairAssociation] = field(default_factory=list)
+    product_pair_associations: List[ProductPairAssociation] = field(
+        default_factory=list
+    )
 
 
 def _empty_analysis() -> BasketAnalysis:
@@ -98,7 +104,7 @@ def get_basket_analysis(store_id: int) -> BasketAnalysis:
     product_map: Dict[int, Product] = {p.product_id: p for p in products}
 
     qty_sold: Dict[int, int] = defaultdict(int)
-    txn_count: Dict[int, int] = defaultdict(int)
+    transaction_count: Dict[int, int] = defaultdict(int)
     revenue: Dict[int, float] = defaultdict(float)
 
     pair_count: Dict[Tuple[int, int], int] = defaultdict(int)
@@ -118,17 +124,17 @@ def get_basket_analysis(store_id: int) -> BasketAnalysis:
         basket_quantity = 0
 
         for purchase in purchases:
-            pid = purchase.product_id
-            qty = purchase.quantity
-            basket_product_ids.add(pid)
-            basket_quantity += qty
+            product_id = purchase.product_id
+            quantity = purchase.quantity
+            basket_product_ids.add(product_id)
+            basket_quantity += quantity
 
-            qty_sold[pid] += qty
-            txn_count[pid] += 1
+            qty_sold[product_id] += quantity
+            transaction_count[product_id] += 1
 
-            product = product_map.get(pid)
+            product = product_map.get(product_id)
             if product is not None:
-                revenue[pid] += product.price * qty
+                revenue[product_id] += product.price * quantity
 
         total_basket_sizes += len(basket_product_ids)
         total_basket_quantities += basket_quantity
@@ -139,25 +145,31 @@ def get_basket_analysis(store_id: int) -> BasketAnalysis:
     num_txn = len(checkouts)
 
     product_summaries: List[ProductSummary] = []
-    for pid in qty_sold:
-        product = product_map.get(pid)
-        product_summaries.append(ProductSummary(
-            product_id=pid,
-            product_name=product.name if product else f"product_{pid}",
-            total_quantity_sold=qty_sold[pid],
-            transaction_count=txn_count[pid],
-            total_revenue=revenue[pid],
-        ))
+    for product_id in qty_sold:
+        product = product_map.get(product_id)
+        product_summaries.append(
+            ProductSummary(
+                product_id=product_id,
+                product_name=product.name if product else f"product_{product_id}",
+                total_quantity_sold=qty_sold[product_id],
+                transaction_count=transaction_count[product_id],
+                total_revenue=revenue[product_id],
+            )
+        )
     product_summaries.sort(key=lambda ps: ps.total_quantity_sold, reverse=True)
 
     product_pair_associations: List[ProductPairAssociation] = []
     for (a_id, b_id), co_count in pair_count.items():
         support_ab = co_count / num_txn
-        support_a = txn_count[a_id] / num_txn
-        support_b = txn_count[b_id] / num_txn
+        support_a = transaction_count[a_id] / num_txn
+        support_b = transaction_count[b_id] / num_txn
 
-        confidence_a_to_b = co_count / txn_count[a_id] if txn_count[a_id] else 0.0
-        confidence_b_to_a = co_count / txn_count[b_id] if txn_count[b_id] else 0.0
+        confidence_a_to_b = (
+            co_count / transaction_count[a_id] if transaction_count[a_id] else 0.0
+        )
+        confidence_b_to_a = (
+            co_count / transaction_count[b_id] if transaction_count[b_id] else 0.0
+        )
 
         expected = support_a * support_b
         lift = support_ab / expected if expected > 0 else 0.0
@@ -165,17 +177,19 @@ def get_basket_analysis(store_id: int) -> BasketAnalysis:
         prod_a = product_map.get(a_id)
         prod_b = product_map.get(b_id)
 
-        product_pair_associations.append(ProductPairAssociation(
-            product_a_id=a_id,
-            product_a_name=prod_a.name if prod_a else f"product_{a_id}",
-            product_b_id=b_id,
-            product_b_name=prod_b.name if prod_b else f"product_{b_id}",
-            co_occurrence_count=co_count,
-            support=support_ab,
-            confidence_a_to_b=confidence_a_to_b,
-            confidence_b_to_a=confidence_b_to_a,
-            lift=lift,
-        ))
+        product_pair_associations.append(
+            ProductPairAssociation(
+                product_a_id=a_id,
+                product_a_name=prod_a.name if prod_a else f"product_{a_id}",
+                product_b_id=b_id,
+                product_b_name=prod_b.name if prod_b else f"product_{b_id}",
+                co_occurrence_count=co_count,
+                support=support_ab,
+                confidence_a_to_b=confidence_a_to_b,
+                confidence_b_to_a=confidence_b_to_a,
+                lift=lift,
+            )
+        )
     product_pair_associations.sort(key=lambda pa: pa.lift, reverse=True)
 
     basket_summary = BasketSummary(
