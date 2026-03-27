@@ -14,6 +14,7 @@ from src.logic import (
     basketAnalysis,
     customerAisleAnalytics,
     customerProductAnalytics,
+    revenueAnalytics,
     sectionTimeAnalysis,
     visualize_simulation,
 )
@@ -26,6 +27,7 @@ END_TIME_PLACEHOLDER = "Select End Time"
 GRAPH_VIEW_TAB_BAR_TAG = "graph_view_tabs"
 GRAPH_PIE_TAB_TAG = "graph_pie_tab"
 GRAPH_ANALYTICS_TAB_TAG = "graph_analytics_tab"
+GRAPH_REVENUE_TAB_TAG = "graph_revenue_tab"
 GRAPH_SIMULATION_TAB_TAG = "graph_simulation_tab"
 ANALYTICS_DATA_TAB_BAR_TAG = "analytics_data_tab_bar"
 ANALYTICS_CUSTOMER_AISLE_TAB_TAG = "analytics_customer_aisle_tab"
@@ -33,6 +35,12 @@ ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG = "analytics_customer_attributes_tab"
 ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG = "analytics_customer_product_tab"
 ANALYTICS_SECTION_TIME_TAB_TAG = "analytics_section_time_tab"
 ANALYTICS_BASKET_TAB_TAG = "analytics_basket_tab"
+CUSTOMER_AISLE_ANALYSIS_TAB_BAR_TAG = "customer_aisle_analysis_tab_bar"
+CUSTOMER_AISLE_GENDER_TAB_TAG = "customer_aisle_gender_tab"
+CUSTOMER_AISLE_AGE_TAB_TAG = "customer_aisle_age_tab"
+CUSTOMER_PRODUCT_ANALYSIS_TAB_BAR_TAG = "customer_product_analysis_tab_bar"
+CUSTOMER_PRODUCT_GENDER_TAB_TAG = "customer_product_gender_tab"
+CUSTOMER_PRODUCT_AGE_TAB_TAG = "customer_product_age_tab"
 BASKET_ANALYSIS_TAB_BAR_TAG = "basket_analysis_tab_bar"
 BASKET_SUMMARY_TAB_TAG = "basket_summary_tab"
 BASKET_PRODUCTS_TAB_TAG = "basket_products_tab"
@@ -62,6 +70,32 @@ SECTION_TIME_STATUS_TAG = "section_time_refresh_status"
 BASKET_REFRESH_BUTTON_TAG = "basket_refresh_button"
 BASKET_PROGRESS_TAG = "basket_refresh_progress"
 BASKET_STATUS_TAG = "basket_refresh_status"
+REVENUE_ANALYTICS_TAB_BAR_TAG = "revenue_analytics_tab_bar"
+REVENUE_SUMMARY_TAB_TAG = "revenue_summary_tab"
+REVENUE_TIME_TAB_TAG = "revenue_time_tab"
+REVENUE_PRODUCT_TAB_TAG = "revenue_product_tab"
+REVENUE_AGE_TAB_TAG = "revenue_age_tab"
+REVENUE_SEX_TAB_TAG = "revenue_sex_tab"
+REVENUE_TIME_VIEW_TAB_BAR_TAG = "revenue_time_view_tab_bar"
+REVENUE_TIME_LINE_TAB_TAG = "revenue_time_line_tab"
+REVENUE_TIME_BAR_TAB_TAG = "revenue_time_bar_tab"
+REVENUE_TIME_TABLE_TAB_TAG = "revenue_time_table_tab"
+REVENUE_REFRESH_BUTTON_TAG = "revenue_refresh_button"
+REVENUE_STATUS_TAG = "revenue_status_text"
+REVENUE_TIME_GRANULARITY_TAG = "revenue_time_granularity"
+REVENUE_TIME_WINDOW_START_TAG = "revenue_time_window_start"
+REVENUE_TIME_WINDOW_END_TAG = "revenue_time_window_end"
+REVENUE_TIME_LINE_METRIC_TAG = "revenue_time_line_metric"
+REVENUE_TIME_BAR_METRIC_TAG = "revenue_time_bar_metric"
+REVENUE_TIME_TABLE_METRIC_TAG = "revenue_time_table_metric"
+REVENUE_SUMMARY_TABLE_TAG = "revenue_summary_table"
+REVENUE_TIME_TABLE_TAG = "revenue_time_table"
+REVENUE_PRODUCT_TABLE_TAG = "revenue_product_table"
+REVENUE_AGE_TABLE_TAG = "revenue_age_table"
+REVENUE_SEX_TABLE_TAG = "revenue_sex_table"
+REVENUE_PRODUCT_FILTER_CONTAINER_TAG = "revenue_product_filter_container"
+REVENUE_PRODUCT_SELECT_ALL_TAG = "revenue_product_select_all"
+REVENUE_PRODUCT_CLEAR_ALL_TAG = "revenue_product_clear_all"
 SIMULATION_SUMMARY_TABLE_TAG = "simulation_summary_table"
 SIMULATION_AISLES_TABLE_TAG = "simulation_aisles_table"
 SIMULATION_RENDER_BUTTON_TAG = "simulation_render_button"
@@ -100,6 +134,15 @@ _SIMULATION_VIDEO_LAST_FRAME_TIME = 0.0
 _SIMULATION_VIDEO_FPS = 20.0
 _SIMULATION_VIDEO_FRAME_COUNT = 0
 _SIMULATION_VIDEO_CURRENT_FRAME = 0
+_REVENUE_ANALYTICS_LOADED = False
+_REVENUE_ANALYTICS_CACHE: revenueAnalytics.RevenueDashboard | None = None
+_REVENUE_PRODUCT_SELECTIONS: dict[str, bool] = {}
+_REVENUE_TIME_GRANULARITY_OPTIONS = ["Hours", "Days", "Years"]
+_REVENUE_TIME_METRIC_OPTIONS = [
+    "Revenue ($)",
+    "Transactions",
+    "Average Transaction Value ($)",
+]
 
 
 def _make_analytics_refresh_state(ready_status: str) -> dict[str, object]:
@@ -284,6 +327,7 @@ def populateDropDowns() -> None:
         # )
     possibleDateTimes = [str(x) for x in s._get_possibleDateTimes()]
     _reset_time_selectors([START_TIME_PLACEHOLDER] + possibleDateTimes)
+    reset_revenue_analytics_view()
 
 
 def callback_startTimeSelected(sender, app_data, user_data):
@@ -295,6 +339,7 @@ def callback_startTimeSelected(sender, app_data, user_data):
             dpg.configure_item("EndTimes", items=[END_TIME_PLACEHOLDER])
             dpg.set_value("EndTimes", END_TIME_PLACEHOLDER)
         s.resetSelectedTimeFrame()
+        reset_revenue_analytics_view()
         return
 
     possibleDateTimes = s._get_possibleDateTimes()
@@ -304,6 +349,7 @@ def callback_startTimeSelected(sender, app_data, user_data):
         _reset_time_selectors(
             [START_TIME_PLACEHOLDER] + [str(x) for x in possibleDateTimes]
         )
+        reset_revenue_analytics_view()
         return
 
     selected_index = possibleDateTimes.index(selected_datetime)
@@ -314,6 +360,7 @@ def callback_startTimeSelected(sender, app_data, user_data):
         dpg.configure_item("EndTimes", items=end_items)
         dpg.set_value("EndTimes", END_TIME_PLACEHOLDER)
     s.resetSelectedTimeFrame()
+    reset_revenue_analytics_view()
 
 
 def callback_EndTimeSelected(sender, app_data, user_data):
@@ -323,6 +370,7 @@ def callback_EndTimeSelected(sender, app_data, user_data):
 
     if start == START_TIME_PLACEHOLDER or end == END_TIME_PLACEHOLDER:
         s.resetSelectedTimeFrame()
+        reset_revenue_analytics_view()
         return
 
     possibleDateTimes = s._get_possibleDateTimes()
@@ -331,9 +379,11 @@ def callback_EndTimeSelected(sender, app_data, user_data):
     end_time = strDateTimeDic.get(end)
     if start_time is None or end_time is None:
         s.resetSelectedTimeFrame()
+        reset_revenue_analytics_view()
         return
 
     s.setSelectedTimeFrame(start_time, end_time)
+    reset_revenue_analytics_view()
 
 
 def _add_stretch_table(
@@ -381,6 +431,13 @@ def _populate_table_rows(
         with dpg.table_row(parent=table_tag):
             for value in padded_values:
                 dpg.add_text(str(value))
+
+
+def _clear_container_children(container_tag: str) -> None:
+    if not dpg.does_item_exist(container_tag):
+        return
+    for child in dpg.get_item_children(container_tag, 1) or []:
+        dpg.delete_item(child)
 
 
 def _mapping_to_rows(mapping: dict) -> list[list[str]]:
@@ -946,6 +1003,593 @@ def _format_bytes(num_bytes: int) -> str:
     return f"{num_bytes} B"
 
 
+def _format_currency(amount: float) -> str:
+    return f"${amount:,.2f}"
+
+
+def _revenue_plot_tag(base: str) -> str:
+    return f"{base}_plot"
+
+
+def _revenue_x_axis_tag(base: str) -> str:
+    return f"{base}_x_axis"
+
+
+def _revenue_y_axis_tag(base: str) -> str:
+    return f"{base}_y_axis"
+
+
+def _clear_plot_axis_series(axis_tag: str) -> None:
+    if not dpg.does_item_exist(axis_tag):
+        return
+    for child in dpg.get_item_children(axis_tag, 1) or []:
+        dpg.delete_item(child)
+
+
+def _reset_xy_plot(base: str) -> None:
+    _clear_plot_axis_series(_revenue_y_axis_tag(base))
+    if dpg.does_item_exist(_revenue_x_axis_tag(base)):
+        dpg.set_axis_ticks(_revenue_x_axis_tag(base), ())
+
+
+def _reset_pie_plot(base: str) -> None:
+    _clear_plot_axis_series(_revenue_y_axis_tag(base))
+
+
+def _create_xy_revenue_plot(parent: str | None, base: str, label: str) -> None:
+    plot_kwargs = {
+        "tag": _revenue_plot_tag(base),
+        "label": label,
+        "width": -1,
+        "height": 260,
+    }
+    if parent is not None:
+        plot_kwargs["parent"] = parent
+
+    with dpg.plot(**plot_kwargs):
+        dpg.add_plot_legend()
+        dpg.add_plot_axis(
+            dpg.mvXAxis,
+            label="Category",
+            tag=_revenue_x_axis_tag(base),
+        )
+        dpg.add_plot_axis(
+            dpg.mvYAxis,
+            label="Revenue ($)",
+            tag=_revenue_y_axis_tag(base),
+        )
+
+
+def _create_pie_revenue_plot(parent: str | None, base: str, label: str) -> None:
+    plot_kwargs = {
+        "tag": _revenue_plot_tag(base),
+        "label": label,
+        "width": -1,
+        "height": 260,
+    }
+    if parent is not None:
+        plot_kwargs["parent"] = parent
+
+    with dpg.plot(**plot_kwargs):
+        dpg.add_plot_legend()
+        dpg.add_plot_axis(
+            dpg.mvXAxis,
+            no_gridlines=True,
+            no_tick_marks=True,
+            no_tick_labels=True,
+            tag=_revenue_x_axis_tag(base),
+        )
+        dpg.set_axis_limits(_revenue_x_axis_tag(base), 0, 1)
+        with dpg.plot_axis(
+            dpg.mvYAxis,
+            no_gridlines=True,
+            no_tick_marks=True,
+            no_tick_labels=True,
+            tag=_revenue_y_axis_tag(base),
+        ):
+            dpg.set_axis_limits(_revenue_y_axis_tag(base), 0, 1)
+
+
+def _update_xy_revenue_plot(
+    base: str,
+    data: list[revenueAnalytics.RevenueDatum],
+    series_label: str,
+    chart_type: str,
+) -> None:
+    x_axis_tag = _revenue_x_axis_tag(base)
+    y_axis_tag = _revenue_y_axis_tag(base)
+    _clear_plot_axis_series(y_axis_tag)
+    if dpg.does_item_exist(x_axis_tag):
+        dpg.set_axis_ticks(x_axis_tag, ())
+    if dpg.does_item_exist(y_axis_tag):
+        dpg.configure_item(y_axis_tag, label=series_label)
+
+    if not data or not dpg.does_item_exist(y_axis_tag):
+        return
+
+    x_values = list(range(len(data)))
+    y_values = [datum.revenue for datum in data]
+    if chart_type == "line":
+        dpg.add_line_series(
+            x=x_values,
+            y=y_values,
+            label=series_label,
+            parent=y_axis_tag,
+        )
+    else:
+        dpg.add_bar_series(
+            x=x_values,
+            y=y_values,
+            label=series_label,
+            weight=0.65,
+            parent=y_axis_tag,
+        )
+
+    ticks = tuple(
+        (
+            datum.display_label if datum.display_label is not None else datum.label,
+            x,
+        )
+        for x, datum in zip(x_values, data)
+    )
+    dpg.set_axis_ticks(x_axis_tag, ticks)
+    dpg.fit_axis_data(x_axis_tag)
+    dpg.fit_axis_data(y_axis_tag)
+
+
+def _top_n_revenue_data(
+    data: list[revenueAnalytics.RevenueDatum],
+    limit: int,
+) -> list[revenueAnalytics.RevenueDatum]:
+    if len(data) <= limit:
+        return data
+
+    kept = data[: limit - 1]
+    other_total = sum(datum.revenue for datum in data[limit - 1 :])
+    return kept + [revenueAnalytics.RevenueDatum(label="Other", revenue=other_total)]
+
+
+def _update_pie_revenue_plot(
+    base: str,
+    data: list[revenueAnalytics.RevenueDatum],
+) -> None:
+    y_axis_tag = _revenue_y_axis_tag(base)
+    _clear_plot_axis_series(y_axis_tag)
+
+    if not data or not dpg.does_item_exist(y_axis_tag):
+        return
+
+    labels = [
+        (
+            datum.display_label if datum.display_label is not None else datum.label
+        )
+        + f" ({_format_currency(datum.revenue)})"
+        for datum in data
+    ]
+    values = [datum.revenue for datum in data]
+    dpg.add_pie_series(
+        x=0.5,
+        y=0.5,
+        radius=0.4,
+        values=values,
+        labels=labels,
+        normalize=True,
+        format="%.1f%%",
+        parent=y_axis_tag,
+    )
+
+
+def _get_selected_graph_time_frame() -> tuple[object | None, object | None]:
+    selected_time_frame = Singleton().get_graphWindowObj().get_selectedTimeFrame()
+    if len(selected_time_frame) != 2:
+        return None, None
+    return selected_time_frame[0], selected_time_frame[1]
+
+
+def _get_selected_revenue_time_granularity() -> str:
+    if not dpg.does_item_exist(REVENUE_TIME_GRANULARITY_TAG):
+        return "hour"
+
+    selected_label = str(dpg.get_value(REVENUE_TIME_GRANULARITY_TAG) or "")
+    mapping = {
+        "Hours": "hour",
+        "Days": "day",
+        "Years": "year",
+    }
+    return mapping.get(selected_label, "hour")
+
+
+def _get_revenue_time_bucket_labels() -> list[str]:
+    if _REVENUE_ANALYTICS_CACHE is None:
+        return []
+    return [datum.label for datum in _REVENUE_ANALYTICS_CACHE.by_time]
+
+
+def _configure_revenue_time_window_controls(labels: list[str]) -> None:
+    if not dpg.does_item_exist(REVENUE_TIME_WINDOW_START_TAG) or not dpg.does_item_exist(
+        REVENUE_TIME_WINDOW_END_TAG
+    ):
+        return
+
+    if not labels:
+        dpg.configure_item(REVENUE_TIME_WINDOW_START_TAG, items=[], enabled=False)
+        dpg.configure_item(REVENUE_TIME_WINDOW_END_TAG, items=[], enabled=False)
+        dpg.set_value(REVENUE_TIME_WINDOW_START_TAG, "")
+        dpg.set_value(REVENUE_TIME_WINDOW_END_TAG, "")
+        return
+
+    current_start = str(dpg.get_value(REVENUE_TIME_WINDOW_START_TAG) or "")
+    current_end = str(dpg.get_value(REVENUE_TIME_WINDOW_END_TAG) or "")
+    selected_start = current_start if current_start in labels else labels[0]
+    start_index = labels.index(selected_start)
+    end_items = labels[start_index:]
+    selected_end = current_end if current_end in end_items else end_items[-1]
+
+    dpg.configure_item(REVENUE_TIME_WINDOW_START_TAG, items=labels, enabled=True)
+    dpg.set_value(REVENUE_TIME_WINDOW_START_TAG, selected_start)
+    dpg.configure_item(REVENUE_TIME_WINDOW_END_TAG, items=end_items, enabled=True)
+    dpg.set_value(REVENUE_TIME_WINDOW_END_TAG, selected_end)
+
+
+def _filter_revenue_time_series_window(
+    data: list[revenueAnalytics.RevenueDatum],
+) -> list[revenueAnalytics.RevenueDatum]:
+    if not data:
+        return []
+
+    labels = [datum.label for datum in data]
+    start_label = (
+        str(dpg.get_value(REVENUE_TIME_WINDOW_START_TAG) or "")
+        if dpg.does_item_exist(REVENUE_TIME_WINDOW_START_TAG)
+        else ""
+    )
+    end_label = (
+        str(dpg.get_value(REVENUE_TIME_WINDOW_END_TAG) or "")
+        if dpg.does_item_exist(REVENUE_TIME_WINDOW_END_TAG)
+        else ""
+    )
+
+    start_index = labels.index(start_label) if start_label in labels else 0
+    end_index = labels.index(end_label) if end_label in labels else len(labels) - 1
+    if end_index < start_index:
+        end_index = start_index
+    return data[start_index : end_index + 1]
+
+
+def _revenue_product_checkbox_tag(product_label: str) -> str:
+    return f"revenue_product_checkbox::{product_label}"
+
+
+def _rebuild_revenue_product_filter_controls(
+    data: list[revenueAnalytics.RevenueDatum],
+    empty_message: str,
+) -> None:
+    global _REVENUE_PRODUCT_SELECTIONS
+    if not dpg.does_item_exist(REVENUE_PRODUCT_FILTER_CONTAINER_TAG):
+        return
+
+    prior_selections = dict(_REVENUE_PRODUCT_SELECTIONS)
+    _REVENUE_PRODUCT_SELECTIONS = {
+        datum.label: prior_selections.get(datum.label, True)
+        for datum in data
+    }
+
+    _clear_container_children(REVENUE_PRODUCT_FILTER_CONTAINER_TAG)
+    if not data:
+        dpg.add_text(empty_message, parent=REVENUE_PRODUCT_FILTER_CONTAINER_TAG, wrap=220)
+        return
+
+    for datum in data:
+        dpg.add_checkbox(
+            label=f"{datum.label} ({_format_currency(datum.revenue)})",
+            default_value=_REVENUE_PRODUCT_SELECTIONS.get(datum.label, True),
+            tag=_revenue_product_checkbox_tag(datum.label),
+            parent=REVENUE_PRODUCT_FILTER_CONTAINER_TAG,
+            callback=callback_revenue_product_filter_changed,
+            user_data=datum.label,
+        )
+
+
+def _get_revenue_time_series(
+    dashboard: revenueAnalytics.RevenueDashboard | None,
+    metric_label: str,
+) -> list[revenueAnalytics.RevenueDatum]:
+    if dashboard is None:
+        return []
+
+    if metric_label == "Transactions":
+        return dashboard.by_time_transaction_count
+    if metric_label == "Average Transaction Value ($)":
+        return dashboard.by_time_average_transaction_value
+    return dashboard.by_time
+
+
+def _format_revenue_time_metric_value(metric_label: str, value: float) -> str:
+    if metric_label == "Transactions":
+        return str(int(round(value)))
+    return _format_currency(value)
+
+
+def _revenue_data_to_rows(
+    data: list[revenueAnalytics.RevenueDatum],
+    value_formatter=None,
+) -> list[list[str]]:
+    total_revenue = sum(datum.revenue for datum in data)
+    rows = []
+    if value_formatter is None:
+        value_formatter = _format_currency
+    for datum in data:
+        share = (datum.revenue / total_revenue) if total_revenue else 0.0
+        rows.append(
+            [
+                datum.display_label if datum.display_label is not None else datum.label,
+                value_formatter(datum.revenue),
+                f"{share * 100:.1f}%",
+            ]
+        )
+    return rows
+
+
+def _get_filtered_revenue_product_data() -> list[revenueAnalytics.RevenueDatum]:
+    if _REVENUE_ANALYTICS_CACHE is None:
+        return []
+    if not _REVENUE_PRODUCT_SELECTIONS:
+        return _REVENUE_ANALYTICS_CACHE.by_product
+    return [
+        datum
+        for datum in _REVENUE_ANALYTICS_CACHE.by_product
+        if _REVENUE_PRODUCT_SELECTIONS.get(datum.label, False)
+    ]
+
+
+def _set_all_revenue_product_filters(selected: bool) -> None:
+    if not _REVENUE_PRODUCT_SELECTIONS:
+        return
+
+    for product_label in list(_REVENUE_PRODUCT_SELECTIONS.keys()):
+        _REVENUE_PRODUCT_SELECTIONS[product_label] = selected
+        checkbox_tag = _revenue_product_checkbox_tag(product_label)
+        if dpg.does_item_exist(checkbox_tag):
+            dpg.set_value(checkbox_tag, selected)
+    _update_revenue_product_views()
+
+
+def _update_revenue_product_views() -> None:
+    filtered_data = _get_filtered_revenue_product_data()
+    _update_xy_revenue_plot(
+        "revenue_product_bar",
+        filtered_data,
+        "Revenue",
+        "bar",
+    )
+    _update_pie_revenue_plot(
+        "revenue_product_pie",
+        filtered_data,
+    )
+
+
+def _update_revenue_time_line_view() -> None:
+    metric_label = (
+        dpg.get_value(REVENUE_TIME_LINE_METRIC_TAG)
+        if dpg.does_item_exist(REVENUE_TIME_LINE_METRIC_TAG)
+        else _REVENUE_TIME_METRIC_OPTIONS[0]
+    )
+    _update_xy_revenue_plot(
+        "revenue_time_line",
+        _filter_revenue_time_series_window(
+            _get_revenue_time_series(_REVENUE_ANALYTICS_CACHE, metric_label)
+        ),
+        metric_label,
+        "line",
+    )
+
+
+def _update_revenue_time_bar_view() -> None:
+    metric_label = (
+        dpg.get_value(REVENUE_TIME_BAR_METRIC_TAG)
+        if dpg.does_item_exist(REVENUE_TIME_BAR_METRIC_TAG)
+        else _REVENUE_TIME_METRIC_OPTIONS[0]
+    )
+    _update_xy_revenue_plot(
+        "revenue_time_bar",
+        _filter_revenue_time_series_window(
+            _get_revenue_time_series(_REVENUE_ANALYTICS_CACHE, metric_label)
+        ),
+        metric_label,
+        "bar",
+    )
+
+
+def _update_revenue_time_table_view() -> None:
+    metric_label = (
+        dpg.get_value(REVENUE_TIME_TABLE_METRIC_TAG)
+        if dpg.does_item_exist(REVENUE_TIME_TABLE_METRIC_TAG)
+        else _REVENUE_TIME_METRIC_OPTIONS[0]
+    )
+    _populate_table_rows(
+        REVENUE_TIME_TABLE_TAG,
+        _revenue_data_to_rows(
+            _filter_revenue_time_series_window(
+                _get_revenue_time_series(_REVENUE_ANALYTICS_CACHE, metric_label)
+            ),
+            value_formatter=lambda value: _format_revenue_time_metric_value(
+                metric_label, value
+            ),
+        ),
+        "No revenue by time data available.",
+        3,
+    )
+
+
+def _update_revenue_time_views() -> None:
+    _update_revenue_time_line_view()
+    _update_revenue_time_bar_view()
+    _update_revenue_time_table_view()
+
+
+def reset_revenue_analytics_view() -> None:
+    global _REVENUE_ANALYTICS_CACHE, _REVENUE_ANALYTICS_LOADED
+    global _REVENUE_PRODUCT_SELECTIONS
+    _REVENUE_ANALYTICS_CACHE = None
+    _REVENUE_ANALYTICS_LOADED = False
+    _REVENUE_PRODUCT_SELECTIONS = {}
+
+    if dpg.does_item_exist(REVENUE_STATUS_TAG):
+        dpg.set_value(
+            REVENUE_STATUS_TAG,
+            "Refresh revenue analytics to load the latest charts.",
+        )
+
+    if dpg.does_item_exist(REVENUE_SUMMARY_TABLE_TAG):
+        _populate_table_rows(
+            REVENUE_SUMMARY_TABLE_TAG,
+            [],
+            "Refresh revenue analytics to load data.",
+            2,
+        )
+    for combo_tag in (
+        REVENUE_TIME_GRANULARITY_TAG,
+        REVENUE_TIME_LINE_METRIC_TAG,
+        REVENUE_TIME_BAR_METRIC_TAG,
+        REVENUE_TIME_TABLE_METRIC_TAG,
+    ):
+        if dpg.does_item_exist(combo_tag):
+            dpg.set_value(
+                combo_tag,
+                "Hours"
+                if combo_tag == REVENUE_TIME_GRANULARITY_TAG
+                else _REVENUE_TIME_METRIC_OPTIONS[0],
+            )
+
+    _configure_revenue_time_window_controls([])
+    _rebuild_revenue_product_filter_controls(
+        [],
+        "Refresh revenue analytics to load product filters.",
+    )
+
+    for table_tag in (
+        REVENUE_TIME_TABLE_TAG,
+        REVENUE_PRODUCT_TABLE_TAG,
+        REVENUE_AGE_TABLE_TAG,
+        REVENUE_SEX_TABLE_TAG,
+    ):
+        if dpg.does_item_exist(table_tag):
+            _populate_table_rows(
+                table_tag,
+                [],
+                "Refresh revenue analytics to load data.",
+                3,
+            )
+
+    for plot_base in (
+        "revenue_time_line",
+        "revenue_time_bar",
+        "revenue_product_bar",
+        "revenue_age_bar",
+        "revenue_sex_bar",
+    ):
+        _reset_xy_plot(plot_base)
+    for plot_base in (
+        "revenue_product_pie",
+        "revenue_age_pie",
+        "revenue_sex_pie",
+    ):
+        _reset_pie_plot(plot_base)
+
+
+def refresh_revenue_analytics_view() -> None:
+    global _REVENUE_ANALYTICS_CACHE, _REVENUE_ANALYTICS_LOADED
+    if not dpg.does_item_exist(REVENUE_SUMMARY_TABLE_TAG):
+        return
+
+    start_time, end_time = _get_selected_graph_time_frame()
+    selected_granularity = _get_selected_revenue_time_granularity()
+    dashboard = revenueAnalytics.get_revenue_dashboard(
+        start_time,
+        end_time,
+        time_granularity=selected_granularity,
+    )
+    _REVENUE_ANALYTICS_CACHE = dashboard
+    summary = dashboard.summary
+
+    summary_rows = [
+        ["Applied Range", summary.applied_range_label],
+        ["Total Revenue", _format_currency(summary.total_revenue)],
+        ["Transactions", str(summary.transaction_count)],
+        ["Average Transaction Value", _format_currency(summary.average_transaction_value)],
+        ["Time Granularity", summary.time_granularity],
+        ["Peak Time Bucket", summary.peak_time_bucket],
+        ["Peak Time Revenue", _format_currency(summary.peak_time_bucket_revenue)],
+        ["Top Product", summary.top_product],
+        ["Top Product Revenue", _format_currency(summary.top_product_revenue)],
+    ]
+    _populate_table_rows(
+        REVENUE_SUMMARY_TABLE_TAG,
+        summary_rows,
+        "No revenue summary available.",
+        2,
+    )
+    _populate_table_rows(
+        REVENUE_PRODUCT_TABLE_TAG,
+        _revenue_data_to_rows(dashboard.by_product),
+        "No revenue by product data available.",
+        3,
+    )
+    _populate_table_rows(
+        REVENUE_AGE_TABLE_TAG,
+        _revenue_data_to_rows(dashboard.by_customer_age),
+        "No revenue by customer age data available.",
+        3,
+    )
+    _populate_table_rows(
+        REVENUE_SEX_TABLE_TAG,
+        _revenue_data_to_rows(dashboard.by_customer_sex),
+        "No revenue by customer sex data available.",
+        3,
+    )
+
+    _configure_revenue_time_window_controls(_get_revenue_time_bucket_labels())
+    _rebuild_revenue_product_filter_controls(
+        dashboard.by_product,
+        "No revenue by product data available.",
+    )
+    _update_revenue_time_views()
+    _update_revenue_product_views()
+    _update_xy_revenue_plot(
+        "revenue_age_bar",
+        dashboard.by_customer_age,
+        "Revenue",
+        "bar",
+    )
+    _update_pie_revenue_plot(
+        "revenue_age_pie",
+        dashboard.by_customer_age,
+    )
+    _update_xy_revenue_plot(
+        "revenue_sex_bar",
+        dashboard.by_customer_sex,
+        "Revenue",
+        "bar",
+    )
+    _update_pie_revenue_plot(
+        "revenue_sex_pie",
+        dashboard.by_customer_sex,
+    )
+
+    if dpg.does_item_exist(REVENUE_STATUS_TAG):
+        time_filter_message = (
+            "using the selected time range."
+            if start_time is not None and end_time is not None
+            else "using all available data."
+        )
+        dpg.set_value(
+            REVENUE_STATUS_TAG,
+            f"Revenue analytics refreshed at {summary.time_granularity} granularity {time_filter_message}",
+        )
+
+    _REVENUE_ANALYTICS_LOADED = True
+
+
 def _get_simulation_summary_rows() -> list[list[str]]:
     overview = visualize_simulation.get_simulation_overview()
     return [
@@ -1419,6 +2063,9 @@ def callback_graph_view_changed(sender, app_data, user_data):
     selected_tab = dpg.get_value(GRAPH_VIEW_TAB_BAR_TAG)
     if selected_tab == GRAPH_ANALYTICS_TAB_TAG:
         _ensure_selected_analytics_subtab_loaded()
+    elif selected_tab == GRAPH_REVENUE_TAB_TAG:
+        if not _REVENUE_ANALYTICS_LOADED:
+            refresh_revenue_analytics_view()
     elif selected_tab == GRAPH_SIMULATION_TAB_TAG:
         refresh_simulation_info_tables()
         if not _SIMULATION_RENDER_STATE["is_rendering"]:
@@ -1479,19 +2126,28 @@ def create_analytics_data_view(parent: str) -> None:
                     "Refresh this analysis without reloading the others.",
                 )
                 dpg.add_spacer(height=6)
-                dpg.add_text("Most common customer gender by aisle")
-                _add_stretch_table(
-                    CUSTOMER_AISLE_GENDER_TABLE_TAG,
-                    ["Aisle ID", "Most Common Gender"],
-                    ANALYTICS_CUSTOMER_AISLE_TAB_TAG,
-                )
-                dpg.add_spacer(height=6)
-                dpg.add_text("Most common customer age by aisle")
-                _add_stretch_table(
-                    CUSTOMER_AISLE_AGE_TABLE_TAG,
-                    ["Aisle ID", "Most Common Age"],
-                    ANALYTICS_CUSTOMER_AISLE_TAB_TAG,
-                )
+                with dpg.tab_bar(tag=CUSTOMER_AISLE_ANALYSIS_TAB_BAR_TAG):
+                    with dpg.tab(
+                        label="Most Common Gender",
+                        tag=CUSTOMER_AISLE_GENDER_TAB_TAG,
+                    ):
+                        dpg.add_text("Most common customer gender by aisle")
+                        _add_stretch_table(
+                            CUSTOMER_AISLE_GENDER_TABLE_TAG,
+                            ["Aisle ID", "Most Common Gender"],
+                            CUSTOMER_AISLE_GENDER_TAB_TAG,
+                        )
+
+                    with dpg.tab(
+                        label="Most Common Age",
+                        tag=CUSTOMER_AISLE_AGE_TAB_TAG,
+                    ):
+                        dpg.add_text("Most common customer age by aisle")
+                        _add_stretch_table(
+                            CUSTOMER_AISLE_AGE_TABLE_TAG,
+                            ["Aisle ID", "Most Common Age"],
+                            CUSTOMER_AISLE_AGE_TAB_TAG,
+                        )
 
             with dpg.tab(
                 label="customerAttributesEstimator.py",
@@ -1526,19 +2182,28 @@ def create_analytics_data_view(parent: str) -> None:
                     "Refresh this product-level analysis only.",
                 )
                 dpg.add_spacer(height=6)
-                dpg.add_text("Most common customer gender by product")
-                _add_stretch_table(
-                    CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
-                    ["Product", "Most Common Gender"],
-                    ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
-                )
-                dpg.add_spacer(height=6)
-                dpg.add_text("Most common customer age by product")
-                _add_stretch_table(
-                    CUSTOMER_PRODUCT_AGE_TABLE_TAG,
-                    ["Product", "Most Common Age"],
-                    ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
-                )
+                with dpg.tab_bar(tag=CUSTOMER_PRODUCT_ANALYSIS_TAB_BAR_TAG):
+                    with dpg.tab(
+                        label="Most Common Gender",
+                        tag=CUSTOMER_PRODUCT_GENDER_TAB_TAG,
+                    ):
+                        dpg.add_text("Most common customer gender by product")
+                        _add_stretch_table(
+                            CUSTOMER_PRODUCT_GENDER_TABLE_TAG,
+                            ["Product", "Most Common Gender"],
+                            CUSTOMER_PRODUCT_GENDER_TAB_TAG,
+                        )
+
+                    with dpg.tab(
+                        label="Most Common Age",
+                        tag=CUSTOMER_PRODUCT_AGE_TAB_TAG,
+                    ):
+                        dpg.add_text("Most common customer age by product")
+                        _add_stretch_table(
+                            CUSTOMER_PRODUCT_AGE_TABLE_TAG,
+                            ["Product", "Most Common Age"],
+                            CUSTOMER_PRODUCT_AGE_TAB_TAG,
+                        )
 
             with dpg.tab(
                 label="sectionTimeAnalysis.py",
@@ -1777,6 +2442,263 @@ def _create_pie_chart_view(parent: str) -> None:
             )
 
 
+def callback_refresh_revenue_analytics(sender, app_data, user_data):
+    refresh_revenue_analytics_view()
+
+
+def callback_revenue_time_granularity_changed(sender, app_data, user_data):
+    refresh_revenue_analytics_view()
+
+
+def callback_revenue_time_window_changed(sender, app_data, user_data):
+    if str(user_data) == "start":
+        _configure_revenue_time_window_controls(_get_revenue_time_bucket_labels())
+    _update_revenue_time_views()
+
+
+def callback_revenue_product_filter_changed(sender, app_data, user_data):
+    _REVENUE_PRODUCT_SELECTIONS[str(user_data)] = bool(app_data)
+    _update_revenue_product_views()
+
+
+def callback_revenue_product_filter_bulk(sender, app_data, user_data):
+    _set_all_revenue_product_filters(bool(user_data))
+
+
+def callback_revenue_time_metric_changed(sender, app_data, user_data):
+    match str(user_data):
+        case "line":
+            _update_revenue_time_line_view()
+        case "bar":
+            _update_revenue_time_bar_view()
+        case "table":
+            _update_revenue_time_table_view()
+
+
+def _create_revenue_time_window_controls() -> None:
+    with dpg.group(horizontal=True):
+        dpg.add_text("Time Frame")
+        dpg.add_combo(
+            _REVENUE_TIME_GRANULARITY_OPTIONS,
+            default_value=_REVENUE_TIME_GRANULARITY_OPTIONS[0],
+            tag=REVENUE_TIME_GRANULARITY_TAG,
+            callback=callback_revenue_time_granularity_changed,
+            width=120,
+        )
+        dpg.add_text("Window Start")
+        dpg.add_combo(
+            [],
+            default_value="",
+            tag=REVENUE_TIME_WINDOW_START_TAG,
+            callback=callback_revenue_time_window_changed,
+            user_data="start",
+            width=180,
+        )
+        dpg.add_text("Window End")
+        dpg.add_combo(
+            [],
+            default_value="",
+            tag=REVENUE_TIME_WINDOW_END_TAG,
+            callback=callback_revenue_time_window_changed,
+            user_data="end",
+            width=180,
+        )
+
+
+def _create_revenue_time_metric_selector(
+    combo_tag: str,
+    user_data: str,
+) -> None:
+    with dpg.group(horizontal=True):
+        dpg.add_text("Display")
+        dpg.add_combo(
+            _REVENUE_TIME_METRIC_OPTIONS,
+            default_value=_REVENUE_TIME_METRIC_OPTIONS[0],
+            tag=combo_tag,
+            callback=callback_revenue_time_metric_changed,
+            user_data=user_data,
+            width=220,
+        )
+
+
+def create_revenue_analytics_view(parent: str) -> None:
+    with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
+        with dpg.group(horizontal=True):
+            dpg.add_button(
+                label="Refresh Revenue Analytics",
+                tag=REVENUE_REFRESH_BUTTON_TAG,
+                callback=callback_refresh_revenue_analytics,
+            )
+            dpg.add_text(
+                "Uses the selected time range on the left when both start and end are set."
+            )
+        dpg.add_text(
+            "Refresh revenue analytics to load the latest charts.",
+            tag=REVENUE_STATUS_TAG,
+        )
+
+        with dpg.tab_bar(tag=REVENUE_ANALYTICS_TAB_BAR_TAG):
+            with dpg.tab(label="Summary", tag=REVENUE_SUMMARY_TAB_TAG):
+                _add_stretch_table(
+                    REVENUE_SUMMARY_TABLE_TAG,
+                    ["Metric", "Value"],
+                    REVENUE_SUMMARY_TAB_TAG,
+                )
+
+            with dpg.tab(label="Revenue by Time", tag=REVENUE_TIME_TAB_TAG):
+                dpg.add_text(
+                    "Choose the time frame and visible window for every time-based revenue view."
+                )
+                _create_revenue_time_window_controls()
+                dpg.add_spacer(height=6)
+                with dpg.tab_bar(tag=REVENUE_TIME_VIEW_TAB_BAR_TAG):
+                    with dpg.tab(label="Line Chart", tag=REVENUE_TIME_LINE_TAB_TAG):
+                        dpg.add_text("Checkout revenue metrics over time")
+                        _create_revenue_time_metric_selector(
+                            REVENUE_TIME_LINE_METRIC_TAG,
+                            "line",
+                        )
+                        dpg.add_spacer(height=6)
+                        _create_xy_revenue_plot(
+                            REVENUE_TIME_LINE_TAB_TAG,
+                            "revenue_time_line",
+                            "Revenue by Time (Line)",
+                        )
+
+                    with dpg.tab(label="Bar Chart", tag=REVENUE_TIME_BAR_TAB_TAG):
+                        dpg.add_text("Compare time buckets with a bar chart")
+                        _create_revenue_time_metric_selector(
+                            REVENUE_TIME_BAR_METRIC_TAG,
+                            "bar",
+                        )
+                        dpg.add_spacer(height=6)
+                        _create_xy_revenue_plot(
+                            REVENUE_TIME_BAR_TAB_TAG,
+                            "revenue_time_bar",
+                            "Revenue by Time (Bar)",
+                        )
+
+                    with dpg.tab(label="Data Table", tag=REVENUE_TIME_TABLE_TAB_TAG):
+                        dpg.add_text("Inspect the current time-based metric as a table")
+                        _create_revenue_time_metric_selector(
+                            REVENUE_TIME_TABLE_METRIC_TAG,
+                            "table",
+                        )
+                        dpg.add_spacer(height=6)
+                        _add_stretch_table(
+                            REVENUE_TIME_TABLE_TAG,
+                            ["Time Bucket", "Value", "Share"],
+                            REVENUE_TIME_TABLE_TAB_TAG,
+                        )
+
+            with dpg.tab(label="Revenue by Product", tag=REVENUE_PRODUCT_TAB_TAG):
+                with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
+                    dpg.add_table_column(init_width_or_weight=0.32)
+                    dpg.add_table_column()
+                    with dpg.table_row():
+                        with dpg.table_cell():
+                            dpg.add_text("Choose which products appear in the charts.")
+                            with dpg.group(horizontal=True):
+                                dpg.add_button(
+                                    label="Select All",
+                                    tag=REVENUE_PRODUCT_SELECT_ALL_TAG,
+                                    callback=callback_revenue_product_filter_bulk,
+                                    user_data=True,
+                                )
+                                dpg.add_button(
+                                    label="Clear All",
+                                    tag=REVENUE_PRODUCT_CLEAR_ALL_TAG,
+                                    callback=callback_revenue_product_filter_bulk,
+                                    user_data=False,
+                                )
+                            with dpg.child_window(
+                                tag=REVENUE_PRODUCT_FILTER_CONTAINER_TAG,
+                                border=True,
+                                width=-1,
+                                height=360,
+                            ):
+                                dpg.add_text(
+                                    "Refresh revenue analytics to load product filters.",
+                                    wrap=220,
+                                )
+                        with dpg.table_cell():
+                            with dpg.table(
+                                policy=dpg.mvTable_SizingStretchProp,
+                                header_row=False,
+                            ):
+                                dpg.add_table_column()
+                                dpg.add_table_column()
+                                with dpg.table_row():
+                                    with dpg.table_cell():
+                                        _create_xy_revenue_plot(
+                                            None,
+                                            "revenue_product_bar",
+                                            "Revenue by Product (Bar)",
+                                        )
+                                    with dpg.table_cell():
+                                        _create_pie_revenue_plot(
+                                            None,
+                                            "revenue_product_pie",
+                                            "Revenue by Product (Pie)",
+                                        )
+                dpg.add_spacer(height=6)
+                _add_stretch_table(
+                    REVENUE_PRODUCT_TABLE_TAG,
+                    ["Product", "Revenue", "Share"],
+                    REVENUE_PRODUCT_TAB_TAG,
+                )
+
+            with dpg.tab(label="Revenue by Customer Age", tag=REVENUE_AGE_TAB_TAG):
+                with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
+                    dpg.add_table_column()
+                    dpg.add_table_column()
+                    with dpg.table_row():
+                        with dpg.table_cell():
+                            _create_xy_revenue_plot(
+                                None,
+                                "revenue_age_bar",
+                                "Revenue by Customer Age (Bar)",
+                            )
+                        with dpg.table_cell():
+                            _create_pie_revenue_plot(
+                                None,
+                                "revenue_age_pie",
+                                "Revenue by Customer Age (Pie)",
+                            )
+                dpg.add_spacer(height=6)
+                _add_stretch_table(
+                    REVENUE_AGE_TABLE_TAG,
+                    ["Age Group", "Revenue", "Share"],
+                    REVENUE_AGE_TAB_TAG,
+                )
+
+            with dpg.tab(label="Revenue by Customer Sex", tag=REVENUE_SEX_TAB_TAG):
+                with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
+                    dpg.add_table_column()
+                    dpg.add_table_column()
+                    with dpg.table_row():
+                        with dpg.table_cell():
+                            _create_xy_revenue_plot(
+                                None,
+                                "revenue_sex_bar",
+                                "Revenue by Customer Sex (Bar)",
+                            )
+                        with dpg.table_cell():
+                            _create_pie_revenue_plot(
+                                None,
+                                "revenue_sex_pie",
+                                "Revenue by Customer Sex (Pie)",
+                            )
+                dpg.add_spacer(height=6)
+                _add_stretch_table(
+                    REVENUE_SEX_TABLE_TAG,
+                    ["Customer Sex", "Revenue", "Share"],
+                    REVENUE_SEX_TAB_TAG,
+                )
+
+        reset_revenue_analytics_view()
+
+
 def create_graph_panel(parent: str) -> None:
     with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
         with dpg.tab_bar(
@@ -1787,6 +2709,8 @@ def create_graph_panel(parent: str) -> None:
                 _create_pie_chart_view(GRAPH_PIE_TAB_TAG)
             with dpg.tab(label="Analytics Data", tag=GRAPH_ANALYTICS_TAB_TAG):
                 create_analytics_data_view(GRAPH_ANALYTICS_TAB_TAG)
+            with dpg.tab(label="Revenue Analytics", tag=GRAPH_REVENUE_TAB_TAG):
+                create_revenue_analytics_view(GRAPH_REVENUE_TAB_TAG)
             with dpg.tab(label="Simulation", tag=GRAPH_SIMULATION_TAB_TAG):
                 create_simulation_view(GRAPH_SIMULATION_TAB_TAG)
 
