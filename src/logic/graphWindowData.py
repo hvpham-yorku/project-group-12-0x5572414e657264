@@ -86,6 +86,9 @@ class GraphWindow:
     def setSelectedTimeFrame(self, time1: datetime, time2: datetime) -> None:
         self._selectedTimeFrame = [time1, time2]
 
+    def get_selectedTimeFrame(self) -> List[datetime]:
+        return list(self._selectedTimeFrame)
+
     def set_checkBoxCounts(self, box: str, newValue: bool) -> None:
         self._checkBoxCounts[box] = newValue
 

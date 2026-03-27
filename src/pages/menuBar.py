@@ -21,6 +21,7 @@ from src.pages.dataAnalyticsWindow import (
     GRAPH_PIE_TAB_TAG,
     GRAPH_VIEW_TAB_BAR_TAG,
     populateDropDowns,
+    reset_revenue_analytics_view,
 )
 
 SINGLETON = singleton.Singleton()
@@ -77,6 +78,7 @@ def _refresh_data_analysis_window() -> None:
         dpg.configure_item("graphPie", show=False)
     if dpg.does_item_exist("graphBar"):
         dpg.configure_item("graphBar", show=False)
+    reset_revenue_analytics_view()
     if dpg.does_item_exist(GRAPH_VIEW_TAB_BAR_TAG):
         dpg.set_value(GRAPH_VIEW_TAB_BAR_TAG, GRAPH_PIE_TAB_TAG)
 
