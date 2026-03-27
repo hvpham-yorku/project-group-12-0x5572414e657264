@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2
 import dearpygui.dearpygui as dpg
 import numpy as np
+from src.HeatMapGenerator import heatmap_generator
 from src.database.model_managers import get_all_stores
 from src.logic import (
     basketAnalysis,
@@ -26,6 +27,7 @@ START_TIME_PLACEHOLDER = "Select Start Time"
 END_TIME_PLACEHOLDER = "Select End Time"
 GRAPH_VIEW_TAB_BAR_TAG = "graph_view_tabs"
 GRAPH_PIE_TAB_TAG = "graph_pie_tab"
+GRAPH_HEATMAP_TAB_TAG = "graph_heatmap_tab"
 GRAPH_ANALYTICS_TAB_TAG = "graph_analytics_tab"
 GRAPH_REVENUE_TAB_TAG = "graph_revenue_tab"
 GRAPH_SIMULATION_TAB_TAG = "graph_simulation_tab"
@@ -96,6 +98,15 @@ REVENUE_SEX_TABLE_TAG = "revenue_sex_table"
 REVENUE_PRODUCT_FILTER_CONTAINER_TAG = "revenue_product_filter_container"
 REVENUE_PRODUCT_SELECT_ALL_TAG = "revenue_product_select_all"
 REVENUE_PRODUCT_CLEAR_ALL_TAG = "revenue_product_clear_all"
+HEATMAP_STORE_SELECTOR_TAG = "heatmap_store_selector"
+HEATMAP_START_HOUR_TAG = "heatmap_start_hour"
+HEATMAP_END_HOUR_TAG = "heatmap_end_hour"
+HEATMAP_RENDER_BUTTON_TAG = "heatmap_render_button"
+HEATMAP_STATUS_TAG = "heatmap_status"
+HEATMAP_SUMMARY_TABLE_TAG = "heatmap_summary_table"
+HEATMAP_TEXTURE_REGISTRY_TAG = "heatmap_texture_registry"
+HEATMAP_TEXTURE_TAG = "heatmap_texture"
+HEATMAP_IMAGE_TAG = "heatmap_image"
 SIMULATION_SUMMARY_TABLE_TAG = "simulation_summary_table"
 SIMULATION_AISLES_TABLE_TAG = "simulation_aisles_table"
 SIMULATION_RENDER_BUTTON_TAG = "simulation_render_button"
@@ -138,6 +149,12 @@ _REVENUE_ANALYTICS_LOADED = False
 _REVENUE_ANALYTICS_CACHE: revenueAnalytics.RevenueDashboard | None = None
 _REVENUE_PRODUCT_SELECTIONS: dict[str, bool] = {}
 _REVENUE_TIME_GRANULARITY_OPTIONS = ["Hours", "Days", "Years"]
+_HEATMAP_STORE_LABEL_TO_ID: dict[str, int] = {}
+_HEATMAP_HOUR_OPTIONS = [f"{hour:02d}:00" for hour in range(24)]
+_HEATMAP_END_HOUR_OPTIONS = [f"{hour:02d}:00" for hour in range(1, 25)]
+HEATMAP_TEX_WIDTH = 640
+HEATMAP_TEX_HEIGHT = 360
+HEATMAP_TEX_DATA = [0.0, 0.0, 0.0, 1.0] * (HEATMAP_TEX_WIDTH * HEATMAP_TEX_HEIGHT)
 _REVENUE_TIME_METRIC_OPTIONS = [
     "Revenue ($)",
     "Transactions",
@@ -1001,6 +1018,217 @@ def _format_bytes(num_bytes: int) -> str:
         size /= 1024
 
     return f"{num_bytes} B"
+
+
+def _ensure_heatmap_texture() -> None:
+    if not dpg.does_item_exist(HEATMAP_TEXTURE_REGISTRY_TAG):
+        with dpg.texture_registry(tag=HEATMAP_TEXTURE_REGISTRY_TAG):
+            pass
+
+    if dpg.does_item_exist(HEATMAP_TEXTURE_TAG):
+        return
+
+    dpg.add_dynamic_texture(
+        width=HEATMAP_TEX_WIDTH,
+        height=HEATMAP_TEX_HEIGHT,
+        default_value=HEATMAP_TEX_DATA,
+        tag=HEATMAP_TEXTURE_TAG,
+        parent=HEATMAP_TEXTURE_REGISTRY_TAG,
+    )
+
+
+def _set_heatmap_status(message: str) -> None:
+    if dpg.does_item_exist(HEATMAP_STATUS_TAG):
+        dpg.set_value(HEATMAP_STATUS_TAG, message)
+
+
+def _queue_heatmap_image_update(data: list[float]) -> None:
+    if not dpg.does_item_exist(HEATMAP_TEXTURE_TAG):
+        return
+    if len(data) != len(HEATMAP_TEX_DATA):
+        return
+    HEATMAP_TEX_DATA[:] = data
+    dpg.set_value(HEATMAP_TEXTURE_TAG, HEATMAP_TEX_DATA)
+
+
+def _rgba_image_to_texture_data(image_rgba: np.ndarray) -> list[float]:
+    image = image_rgba
+    if image.shape[0] != HEATMAP_TEX_HEIGHT or image.shape[1] != HEATMAP_TEX_WIDTH:
+        image = cv2.resize(
+            image,
+            (HEATMAP_TEX_WIDTH, HEATMAP_TEX_HEIGHT),
+            interpolation=cv2.INTER_AREA,
+        )
+    return (image.astype("float32") / 255.0).reshape(-1).tolist()
+
+
+def _set_heatmap_image(image_rgba: np.ndarray) -> None:
+    _ensure_heatmap_texture()
+    _queue_heatmap_image_update(_rgba_image_to_texture_data(image_rgba))
+
+
+def _set_heatmap_blank_frame() -> None:
+    blank_image = np.zeros((HEATMAP_TEX_HEIGHT, HEATMAP_TEX_WIDTH, 4), dtype=np.uint8)
+    blank_image[:, :, 3] = 255
+    _set_heatmap_image(blank_image)
+
+
+def _get_heatmap_store_options() -> list[str]:
+    global _HEATMAP_STORE_LABEL_TO_ID
+    stores = list(get_all_stores())
+    _HEATMAP_STORE_LABEL_TO_ID = {
+        f"{store.store_id}: {store.name}": store.store_id for store in stores
+    }
+    return list(_HEATMAP_STORE_LABEL_TO_ID.keys())
+
+
+def _get_selected_heatmap_store_id() -> int | None:
+    if not dpg.does_item_exist(HEATMAP_STORE_SELECTOR_TAG):
+        return None
+    selected_label = str(dpg.get_value(HEATMAP_STORE_SELECTOR_TAG) or "")
+    return _HEATMAP_STORE_LABEL_TO_ID.get(selected_label)
+
+
+def _get_selected_heatmap_hour(combo_tag: str) -> int | None:
+    if not dpg.does_item_exist(combo_tag):
+        return None
+    selected_value = str(dpg.get_value(combo_tag) or "")
+    if not selected_value or ":" not in selected_value:
+        return None
+    hour_str = selected_value.split(":", 1)[0]
+    try:
+        return int(hour_str)
+    except ValueError:
+        return None
+
+
+def _refresh_heatmap_store_options() -> None:
+    if not dpg.does_item_exist(HEATMAP_STORE_SELECTOR_TAG):
+        return
+
+    store_options = _get_heatmap_store_options()
+    current_value = str(dpg.get_value(HEATMAP_STORE_SELECTOR_TAG) or "")
+    selected_value = current_value if current_value in store_options else ""
+    if not selected_value and store_options:
+        selected_value = store_options[0]
+
+    dpg.configure_item(
+        HEATMAP_STORE_SELECTOR_TAG,
+        items=store_options,
+        enabled=bool(store_options),
+    )
+    dpg.set_value(HEATMAP_STORE_SELECTOR_TAG, selected_value)
+    if dpg.does_item_exist(HEATMAP_RENDER_BUTTON_TAG):
+        dpg.configure_item(HEATMAP_RENDER_BUTTON_TAG, enabled=bool(store_options))
+
+
+def reset_heatmap_view() -> None:
+    _refresh_heatmap_store_options()
+    _set_heatmap_blank_frame()
+    _set_heatmap_status("Select a store and hour window, then render the heatmap.")
+    if dpg.does_item_exist(HEATMAP_START_HOUR_TAG):
+        dpg.set_value(HEATMAP_START_HOUR_TAG, _HEATMAP_HOUR_OPTIONS[0])
+    if dpg.does_item_exist(HEATMAP_END_HOUR_TAG):
+        dpg.set_value(HEATMAP_END_HOUR_TAG, _HEATMAP_END_HOUR_OPTIONS[-1])
+    if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+        _populate_table_rows(
+            HEATMAP_SUMMARY_TABLE_TAG,
+            [],
+            "Render a heatmap to see its summary.",
+            2,
+        )
+
+
+def refresh_heatmap_view() -> None:
+    store_id = _get_selected_heatmap_store_id()
+    start_hour = _get_selected_heatmap_hour(HEATMAP_START_HOUR_TAG)
+    end_hour = _get_selected_heatmap_hour(HEATMAP_END_HOUR_TAG)
+
+    if store_id is None:
+        _set_heatmap_blank_frame()
+        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+            _populate_table_rows(
+                HEATMAP_SUMMARY_TABLE_TAG,
+                [],
+                "Render a heatmap to see its summary.",
+                2,
+            )
+        _set_heatmap_status("No store is available for heatmap rendering.")
+        return
+    if start_hour is None or end_hour is None:
+        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+            _populate_table_rows(
+                HEATMAP_SUMMARY_TABLE_TAG,
+                [],
+                "Render a heatmap to see its summary.",
+                2,
+            )
+        _set_heatmap_status("Choose a valid heatmap time window.")
+        return
+    if start_hour >= end_hour:
+        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+            _populate_table_rows(
+                HEATMAP_SUMMARY_TABLE_TAG,
+                [],
+                "Render a heatmap to see its summary.",
+                2,
+            )
+        _set_heatmap_status("End hour must be later than the start hour.")
+        return
+
+    store, aisles, paths = heatmap_generator.get_store_heatmap_inputs(store_id)
+    if store is None:
+        _set_heatmap_blank_frame()
+        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+            _populate_table_rows(
+                HEATMAP_SUMMARY_TABLE_TAG,
+                [],
+                "Render a heatmap to see its summary.",
+                2,
+            )
+        _set_heatmap_status("Failed to load the selected store.")
+        return
+    if store.width <= 0 or store.height <= 0:
+        _set_heatmap_blank_frame()
+        if dpg.does_item_exist(HEATMAP_SUMMARY_TABLE_TAG):
+            _populate_table_rows(
+                HEATMAP_SUMMARY_TABLE_TAG,
+                [],
+                "Render a heatmap to see its summary.",
+                2,
+            )
+        _set_heatmap_status(
+            f"{store.name} has invalid dimensions. Set store width and height first."
+        )
+        return
+
+    filtered_paths = heatmap_generator.filter_paths_by_time_range(paths, start_hour, end_hour)
+    image_rgba = heatmap_generator.render_custom_heatmap_rgba(
+        paths,
+        aisles,
+        store,
+        start_hour,
+        end_hour,
+        width=HEATMAP_TEX_WIDTH,
+        height=HEATMAP_TEX_HEIGHT,
+    )
+    _set_heatmap_image(image_rgba)
+    _populate_table_rows(
+        HEATMAP_SUMMARY_TABLE_TAG,
+        [
+            ["Store", f"{store.store_id}: {store.name}"],
+            ["Hour Window", f"{start_hour:02d}:00 - {end_hour:02d}:00"],
+            ["Store Size", f"{store.width} x {store.height}"],
+            ["Aisles", str(len(aisles))],
+            ["Total Paths", str(len(paths))],
+            ["Filtered Paths", str(len(filtered_paths))],
+        ],
+        "Render a heatmap to see its summary.",
+        2,
+    )
+    _set_heatmap_status(
+        f"Rendered heatmap for {store.name} with {len(filtered_paths)} path points."
+    )
 
 
 def _format_currency(amount: float) -> str:
@@ -1963,6 +2191,10 @@ def callback_refresh_simulation_info(sender, app_data, user_data):
     _set_simulation_playback_button_state()
 
 
+def callback_render_heatmap(sender, app_data, user_data):
+    refresh_heatmap_view()
+
+
 def callback_render_simulation(sender, app_data, user_data):
     global _SIMULATION_VIDEO_PLAYING
     with _SIMULATION_RENDER_LOCK:
@@ -2063,6 +2295,8 @@ def callback_graph_view_changed(sender, app_data, user_data):
     selected_tab = dpg.get_value(GRAPH_VIEW_TAB_BAR_TAG)
     if selected_tab == GRAPH_ANALYTICS_TAB_TAG:
         _ensure_selected_analytics_subtab_loaded()
+    elif selected_tab == GRAPH_HEATMAP_TAB_TAG:
+        _refresh_heatmap_store_options()
     elif selected_tab == GRAPH_REVENUE_TAB_TAG:
         if not _REVENUE_ANALYTICS_LOADED:
             refresh_revenue_analytics_view()
@@ -2402,6 +2636,65 @@ def create_simulation_view(parent: str) -> None:
     _set_simulation_playback_button_state()
 
 
+def create_heatmap_view(parent: str) -> None:
+    _ensure_heatmap_texture()
+    with dpg.child_window(parent=parent, border=False, width=-1, height=-1):
+        dpg.add_text(
+            "Render a customer-density heatmap using the existing heatmap generator."
+        )
+        with dpg.group(horizontal=True):
+            dpg.add_combo(
+                items=[],
+                default_value="",
+                tag=HEATMAP_STORE_SELECTOR_TAG,
+                label="Store",
+                width=220,
+            )
+            dpg.add_combo(
+                items=_HEATMAP_HOUR_OPTIONS,
+                default_value=_HEATMAP_HOUR_OPTIONS[0],
+                tag=HEATMAP_START_HOUR_TAG,
+                label="Start Hour",
+                width=120,
+            )
+            dpg.add_combo(
+                items=_HEATMAP_END_HOUR_OPTIONS,
+                default_value=_HEATMAP_END_HOUR_OPTIONS[-1],
+                tag=HEATMAP_END_HOUR_TAG,
+                label="End Hour",
+                width=120,
+            )
+            dpg.add_button(
+                label="Render Heatmap",
+                tag=HEATMAP_RENDER_BUTTON_TAG,
+                callback=callback_render_heatmap,
+            )
+        dpg.add_text(
+            "Select a store and hour window, then render the heatmap.",
+            tag=HEATMAP_STATUS_TAG,
+            wrap=900,
+        )
+        with dpg.table(policy=dpg.mvTable_SizingStretchProp, header_row=False):
+            dpg.add_table_column(init_width_or_weight=0.38)
+            dpg.add_table_column()
+            with dpg.table_row():
+                with dpg.table_cell() as summary_cell:
+                    _add_stretch_table(
+                        HEATMAP_SUMMARY_TABLE_TAG,
+                        ["Property", "Value"],
+                        summary_cell,
+                    )
+                with dpg.table_cell():
+                    dpg.add_image(
+                        HEATMAP_TEXTURE_TAG,
+                        tag=HEATMAP_IMAGE_TAG,
+                        width=HEATMAP_TEX_WIDTH,
+                        height=HEATMAP_TEX_HEIGHT,
+                    )
+
+    reset_heatmap_view()
+
+
 def _create_pie_chart_view(parent: str) -> None:
     dpg.add_text("Use Update Chart to render the selected data.", parent=parent)
     with dpg.plot(
@@ -2707,6 +3000,8 @@ def create_graph_panel(parent: str) -> None:
         ):
             with dpg.tab(label="Pie Chart", tag=GRAPH_PIE_TAB_TAG):
                 _create_pie_chart_view(GRAPH_PIE_TAB_TAG)
+            with dpg.tab(label="Heatmap", tag=GRAPH_HEATMAP_TAB_TAG):
+                create_heatmap_view(GRAPH_HEATMAP_TAB_TAG)
             with dpg.tab(label="Analytics Data", tag=GRAPH_ANALYTICS_TAB_TAG):
                 create_analytics_data_view(GRAPH_ANALYTICS_TAB_TAG)
             with dpg.tab(label="Revenue Analytics", tag=GRAPH_REVENUE_TAB_TAG):
