@@ -62,7 +62,7 @@ class RevenueAnalyticsTestCase(unittest.TestCase):
         self.assertEqual(dashboard.summary.transaction_count, 2)
         self.assertAlmostEqual(dashboard.summary.average_transaction_value, 9.0)
         self.assertEqual(dashboard.summary.time_granularity, "Hour")
-        self.assertEqual(dashboard.summary.peak_time_bucket, "2026-03-20 10:00")
+        self.assertEqual(dashboard.summary.peak_time_bucket, "10:00")
         self.assertAlmostEqual(dashboard.summary.peak_time_bucket_revenue, 10.0)
         self.assertEqual(dashboard.summary.top_product, "Milk")
         self.assertAlmostEqual(dashboard.summary.top_product_revenue, 12.0)
@@ -146,6 +146,66 @@ class RevenueAnalyticsTestCase(unittest.TestCase):
         self.assertEqual(
             [(datum.label, datum.revenue) for datum in dashboard.by_product],
             [("Milk", 10.0)],
+        )
+
+    def test_revenue_dashboard_supports_explicit_time_granularity(self):
+        store = mm.add_store(Store(name="Store A", owner="Owner"))
+        aisle = mm.add_aisle(Aisle(store_id=store.store_id))
+        product = mm.add_product(
+            Product(store_id=store.store_id, aisle_id=aisle.aisle_id, name="Milk", price=5.0)
+        )
+        customer = mm.add_customer(
+            Customer(store_id=store.store_id, age="25-34", sex="Female")
+        )
+
+        first_time = datetime(2025, 1, 1, 9, 0, 0)
+        second_time = datetime(2026, 1, 1, 12, 0, 0)
+        third_time = datetime(2026, 1, 2, 13, 0, 0)
+
+        for created_at, total_price in (
+            (first_time, 5.0),
+            (second_time, 10.0),
+            (third_time, 15.0),
+        ):
+            checkout = mm.add_checkout(
+                Checkout(
+                    store_id=store.store_id,
+                    customer_id=customer.customer_id,
+                    total_price=total_price,
+                    created_at=created_at,
+                )
+            )
+            mm.add_purchase(
+                Purchase(
+                    product_id=product.product_id,
+                    checkout_id=checkout.checkout_id,
+                    quantity=int(total_price / 5.0),
+                )
+            )
+
+        yearly_dashboard = get_revenue_dashboard(time_granularity="Years")
+        self.assertEqual(yearly_dashboard.summary.time_granularity, "Year")
+        self.assertEqual(
+            [(datum.label, datum.revenue) for datum in yearly_dashboard.by_time],
+            [("2025", 5.0), ("2026", 25.0)],
+        )
+
+        daily_dashboard = get_revenue_dashboard(time_granularity="day")
+        self.assertEqual(daily_dashboard.summary.time_granularity, "Day")
+        self.assertEqual(
+            [(datum.label, datum.revenue) for datum in daily_dashboard.by_time],
+            [("2025-01-01", 5.0), ("2026-01-01", 10.0), ("2026-01-02", 15.0)],
+        )
+
+        hourly_dashboard = get_revenue_dashboard(time_granularity="hours")
+        self.assertEqual(hourly_dashboard.summary.time_granularity, "Hour")
+        self.assertEqual(
+            [(datum.label, datum.revenue) for datum in hourly_dashboard.by_time],
+            [
+                ("2025-01-01 09:00", 5.0),
+                ("2026-01-01 12:00", 10.0),
+                ("2026-01-02 13:00", 15.0),
+            ],
         )
 
 

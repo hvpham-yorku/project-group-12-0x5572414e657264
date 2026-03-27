@@ -103,6 +103,9 @@ class TestMainWindowUI(GuiDbTestCase):
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_AGE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_SEX_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_VIEW_TAB_BAR_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_GRANULARITY_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_WINDOW_START_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_WINDOW_END_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_LINE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_BAR_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAB_TAG))
@@ -110,6 +113,11 @@ class TestMainWindowUI(GuiDbTestCase):
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_LINE_METRIC_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_BAR_METRIC_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_TABLE_METRIC_TAG))
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_FILTER_CONTAINER_TAG)
+        )
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_SELECT_ALL_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_CLEAR_ALL_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_SUMMARY_TABLE_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_TABLE_TAG))
@@ -329,7 +337,7 @@ class TestMainWindowUI(GuiDbTestCase):
         self.assertIn(["Total Revenue", "$6.75"], summary_rows)
         self.assertIn(["Transactions", "1"], summary_rows)
         self.assertIn(["Top Product", "Milk"], summary_rows)
-        self.assertIn(["2026-01-01 12:00", "$6.75", "100.0%"], time_rows)
+        self.assertIn(["12:00", "$6.75", "100.0%"], time_rows)
         self.assertIn(["Milk", "$4.25", "63.0%"], product_rows)
         self.assertIn(["25-32", "$6.75", "100.0%"], age_rows)
         self.assertIn(["Female", "$6.75", "100.0%"], sex_rows)
@@ -337,7 +345,109 @@ class TestMainWindowUI(GuiDbTestCase):
         dpg.set_value(dataAnalyticsWindow.REVENUE_TIME_TABLE_METRIC_TAG, "Transactions")
         dataAnalyticsWindow.callback_revenue_time_metric_changed(None, None, "table")
         transaction_time_rows = _get_row_values(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAG)
-        self.assertIn(["2026-01-01 12:00", "1", "100.0%"], transaction_time_rows)
+        self.assertIn(["12:00", "1", "100.0%"], transaction_time_rows)
+
+    def test_revenue_analytics_supports_product_filters_and_time_windows(self):
+        store = mm.add_store(Store(name="Store A", owner="Owner A"))
+        aisle = mm.add_aisle(Aisle(store_id=store.store_id))
+        milk = mm.add_product(
+            Product(
+                store_id=store.store_id,
+                aisle_id=aisle.aisle_id,
+                name="Milk",
+                price=4.25,
+                order=1,
+            )
+        )
+        bread = mm.add_product(
+            Product(
+                store_id=store.store_id,
+                aisle_id=aisle.aisle_id,
+                name="Bread",
+                price=2.50,
+                order=2,
+            )
+        )
+        eggs = mm.add_product(
+            Product(
+                store_id=store.store_id,
+                aisle_id=aisle.aisle_id,
+                name="Eggs",
+                price=3.00,
+                order=3,
+            )
+        )
+        customer = mm.add_customer(
+            Customer(store_id=store.store_id, age="25-32", sex="Female")
+        )
+
+        checkout_specs = [
+            (datetime(2025, 1, 1, 9, 15, 0), 4.25, [(milk, 1)]),
+            (datetime(2026, 1, 1, 12, 15, 0), 6.75, [(milk, 1), (bread, 1)]),
+            (datetime(2026, 1, 2, 13, 15, 0), 3.00, [(eggs, 1)]),
+        ]
+        for created_at, total_price, purchases in checkout_specs:
+            checkout = mm.add_checkout(
+                Checkout(
+                    store_id=store.store_id,
+                    customer_id=customer.customer_id,
+                    total_price=total_price,
+                    created_at=created_at,
+                )
+            )
+            for product, quantity in purchases:
+                mm.add_purchase(
+                    Purchase(
+                        product_id=product.product_id,
+                        checkout_id=checkout.checkout_id,
+                        quantity=quantity,
+                    )
+                )
+
+        mainWindow.mainWindow("main_window")
+        dataAnalyticsWindow.refresh_revenue_analytics_view()
+
+        self.assertEqual(dpg.get_value(dataAnalyticsWindow.REVENUE_TIME_GRANULARITY_TAG), "Hours")
+        self.assertEqual(
+            dpg.get_value(dataAnalyticsWindow.REVENUE_TIME_WINDOW_START_TAG),
+            "2025-01-01 09:00",
+        )
+        self.assertEqual(
+            dpg.get_value(dataAnalyticsWindow.REVENUE_TIME_WINDOW_END_TAG),
+            "2026-01-02 13:00",
+        )
+
+        dpg.set_value(dataAnalyticsWindow.REVENUE_TIME_GRANULARITY_TAG, "Days")
+        dataAnalyticsWindow.callback_revenue_time_granularity_changed(None, None, None)
+        daily_rows = _get_row_values(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAG)
+        self.assertIn(["01", "$4.25", "30.4%"], daily_rows)
+        self.assertIn(["01", "$6.75", "48.2%"], daily_rows)
+        self.assertIn(["02", "$3.00", "21.4%"], daily_rows)
+
+        dpg.set_value(dataAnalyticsWindow.REVENUE_TIME_WINDOW_START_TAG, "2026-01-01")
+        dataAnalyticsWindow.callback_revenue_time_window_changed(None, None, "start")
+        narrowed_rows = _get_row_values(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAG)
+        self.assertNotIn(["01", "$4.25", "30.4%"], narrowed_rows)
+        self.assertIn(["01", "$6.75", "69.2%"], narrowed_rows)
+        self.assertIn(["02", "$3.00", "30.8%"], narrowed_rows)
+
+        dpg.set_value(dataAnalyticsWindow.REVENUE_TIME_GRANULARITY_TAG, "Years")
+        dataAnalyticsWindow.callback_revenue_time_granularity_changed(None, None, None)
+        yearly_rows = _get_row_values(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAG)
+        self.assertIn(["2025", "$4.25", "30.4%"], yearly_rows)
+        self.assertIn(["2026", "$9.75", "69.6%"], yearly_rows)
+
+        bread_checkbox = dataAnalyticsWindow._revenue_product_checkbox_tag("Bread")
+        eggs_checkbox = dataAnalyticsWindow._revenue_product_checkbox_tag("Eggs")
+        dpg.set_value(bread_checkbox, False)
+        dataAnalyticsWindow.callback_revenue_product_filter_changed(None, False, "Bread")
+        dpg.set_value(eggs_checkbox, False)
+        dataAnalyticsWindow.callback_revenue_product_filter_changed(None, False, "Eggs")
+        filtered_products = dataAnalyticsWindow._get_filtered_revenue_product_data()
+        self.assertEqual(
+            [(datum.label, datum.revenue) for datum in filtered_products],
+            [("Milk", 8.5)],
+        )
 
     def test_graph_panel_populates_simulation_tables(self):
         mainWindow.mainWindow("main_window")

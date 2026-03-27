@@ -23,10 +23,7 @@ def get_store_dimensions(store: Store) -> Tuple[int, int]:
 # ---------------------------
 # PATHS → MATRIX
 # ---------------------------
-def paths_to_matrix(
-        paths: List[Path],
-        store: Store
-) -> npt.NDArray[np.float64]:
+def paths_to_matrix(paths: List[Path], store: Store) -> npt.NDArray[np.float64]:
 
     width, height = get_store_dimensions(store)
     matrix = np.zeros((height, width))
@@ -45,12 +42,11 @@ def paths_to_matrix(
 # TIME FILTER
 # ---------------------------
 def filter_paths_by_time_range(
-        paths: List[Path],
-        start_hour: int,
-        end_hour: int
+    paths: List[Path], start_hour: int, end_hour: int
 ) -> List[Path]:
     return [
-        p for p in paths
+        p
+        for p in paths
         if p.timestamp is not None and start_hour <= p.timestamp.hour < end_hour
     ]
 
@@ -59,10 +55,10 @@ def filter_paths_by_time_range(
 # HEATMAP OVERLAY (WITH BACKGROUND)
 # ---------------------------
 def plot_overlay_heatmap(
-        paths: List[Path],
-        store: Store,
-        title: str = "Heatmap",
-        background_image_path: Optional[str] = None
+    paths: List[Path],
+    store: Store,
+    title: str = "Heatmap",
+    background_image_path: Optional[str] = None,
 ) -> None:
 
     matrix = log_normalization(paths_to_matrix(paths, store))
@@ -75,22 +71,13 @@ def plot_overlay_heatmap(
     # ---------------------------
     if background_image_path is not None:
         img = plt.imread(background_image_path)
-        ax.imshow(
-            img,
-            extent=[0, width, 0, height],
-            origin='lower',
-            aspect='auto'
-        )
+        ax.imshow(img, extent=[0, width, 0, height], origin="lower", aspect="auto")
 
     # ---------------------------
     # HEATMAP
     # ---------------------------
     heatmap = ax.imshow(
-        matrix,
-        origin='lower',
-        cmap='inferno',
-        alpha=0.6,
-        extent=[0, width, 0, height]
+        matrix, origin="lower", cmap="inferno", alpha=0.6, extent=[0, width, 0, height]
     )
 
     plt.colorbar(heatmap, ax=ax, label="Customer Density")
@@ -112,18 +99,15 @@ def plot_overlay_heatmap(
 # CUSTOM TIME HEATMAP (ONLY ONE YOU NEED)
 # ---------------------------
 def generate_custom_heatmap(
-        paths: List[Path],
-        aisles: List[Aisle],  # kept for compatibility
-        store: Store,
-        start_hour: int,
-        end_hour: int,
-        background_image_path: Optional[str] = None
+    paths: List[Path],
+    aisles: List[Aisle],  # kept for compatibility
+    store: Store,
+    start_hour: int,
+    end_hour: int,
+    background_image_path: Optional[str] = None,
 ):
     filtered = filter_paths_by_time_range(paths, start_hour, end_hour)
 
     plot_overlay_heatmap(
-        filtered,
-        store,
-        f"{start_hour}:00 - {end_hour}:00",
-        background_image_path
+        filtered, store, f"{start_hour}:00 - {end_hour}:00", background_image_path
     )

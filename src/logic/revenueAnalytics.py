@@ -18,6 +18,7 @@ from src.database.model_managers import (
 class RevenueDatum:
     label: str
     revenue: float
+    display_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,34 @@ def _determine_time_granularity(created_times: list[datetime]) -> str:
     return "hour"
 
 
+def _normalize_time_granularity(granularity: str | None) -> str | None:
+    if granularity is None:
+        return None
+
+    normalized = granularity.strip().lower()
+    aliases = {
+        "year": "year",
+        "years": "year",
+        "month": "month",
+        "months": "month",
+        "day": "day",
+        "days": "day",
+        "hour": "hour",
+        "hours": "hour",
+    }
+    return aliases.get(normalized)
+
+
 def _bucket_datetime(timestamp: datetime, granularity: str) -> datetime:
+    if granularity == "year":
+        return timestamp.replace(
+            month=1,
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
     if granularity == "month":
         return timestamp.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if granularity == "day":
@@ -91,11 +119,23 @@ def _bucket_datetime(timestamp: datetime, granularity: str) -> datetime:
 
 
 def _format_bucket_label(bucket: datetime, granularity: str) -> str:
+    if granularity == "year":
+        return bucket.strftime("%Y")
     if granularity == "month":
         return bucket.strftime("%Y-%m")
     if granularity == "day":
         return bucket.strftime("%Y-%m-%d")
     return bucket.strftime("%Y-%m-%d %H:00")
+
+
+def _format_bucket_display_label(bucket: datetime, granularity: str) -> str:
+    if granularity == "year":
+        return bucket.strftime("%Y")
+    if granularity == "month":
+        return bucket.strftime("%m")
+    if granularity == "day":
+        return bucket.strftime("%d")
+    return bucket.strftime("%H:00")
 
 
 def _age_sort_key(label: str) -> tuple[int, int, str]:
@@ -163,12 +203,15 @@ def _build_checkout_contexts(
 def get_revenue_dashboard(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
+    time_granularity: str | None = None,
 ) -> RevenueDashboard:
     contexts = _build_checkout_contexts(start_time, end_time)
     created_times = [
         context.created_at for context in contexts if context.created_at is not None
     ]
-    time_granularity = _determine_time_granularity(created_times)
+    normalized_granularity = _normalize_time_granularity(time_granularity)
+    if normalized_granularity is None:
+        normalized_granularity = _determine_time_granularity(created_times)
 
     time_totals: defaultdict[datetime, float] = defaultdict(float)
     time_transaction_counts: defaultdict[datetime, int] = defaultdict(int)
@@ -187,7 +230,7 @@ def get_revenue_dashboard(
         sex_totals[context.customer_sex] += context.total_price
 
         if context.created_at is not None:
-            time_bucket = _bucket_datetime(context.created_at, time_granularity)
+            time_bucket = _bucket_datetime(context.created_at, normalized_granularity)
             time_totals[time_bucket] += context.total_price
             time_transaction_counts[time_bucket] += 1
 
@@ -196,26 +239,29 @@ def get_revenue_dashboard(
 
     by_time = [
         RevenueDatum(
-            label=_format_bucket_label(bucket, time_granularity),
+            label=_format_bucket_label(bucket, normalized_granularity),
             revenue=revenue,
+            display_label=_format_bucket_display_label(bucket, normalized_granularity),
         )
         for bucket, revenue in sorted(time_totals.items())
     ]
     by_time_transaction_count = [
         RevenueDatum(
-            label=_format_bucket_label(bucket, time_granularity),
+            label=_format_bucket_label(bucket, normalized_granularity),
             revenue=float(transaction_count),
+            display_label=_format_bucket_display_label(bucket, normalized_granularity),
         )
         for bucket, transaction_count in sorted(time_transaction_counts.items())
     ]
     by_time_average_transaction_value = [
         RevenueDatum(
-            label=_format_bucket_label(bucket, time_granularity),
+            label=_format_bucket_label(bucket, normalized_granularity),
             revenue=(
                 time_totals[bucket] / time_transaction_counts[bucket]
                 if time_transaction_counts[bucket]
                 else 0.0
             ),
+            display_label=_format_bucket_display_label(bucket, normalized_granularity),
         )
         for bucket in sorted(time_totals.keys())
     ]
@@ -261,8 +307,12 @@ def get_revenue_dashboard(
             total_revenue=total_revenue,
             transaction_count=transaction_count,
             average_transaction_value=average_transaction_value,
-            time_granularity=time_granularity.title(),
-            peak_time_bucket=peak_time_bucket.label if peak_time_bucket else "No revenue data",
+            time_granularity=normalized_granularity.title(),
+            peak_time_bucket=(
+                peak_time_bucket.display_label or peak_time_bucket.label
+                if peak_time_bucket
+                else "No revenue data"
+            ),
             peak_time_bucket_revenue=peak_time_bucket.revenue if peak_time_bucket else 0.0,
             top_product=top_product.label if top_product else "No revenue data",
             top_product_revenue=top_product.revenue if top_product else 0.0,
