@@ -613,14 +613,11 @@ def get_allDemographicCategories() -> list[str]:
 
 def get_allPossibleDateTimes() -> list[str]:
     customers = CustomerTable.select()
-    # paths = PathTable.select()
     checkouts = CheckoutTable.select()
     ret = set()
     for customer in customers:
         ret.add(customer.entered_at)
         ret.add(customer.exited_at)
-    # for path in paths:
-    #     ret.add(path.timestamp)
     for checkout in checkouts:
         ret.add(checkout.created_at)
     if None in ret:
@@ -642,8 +639,6 @@ def get_AllProductAndTimeDataToGraph(
     purchases = PurchaseTable.select()
     ret = [[], []]
     data = defaultdict(int)
-    # ret is count, tags
-    # if countTypeSelected == "product":
     for purchase in purchases:
         purchaseObj = ProductTable.get(ProductTable.product_id == purchase.product_id)
         checkoutObj = CheckoutTable.get(
@@ -653,13 +648,11 @@ def get_AllProductAndTimeDataToGraph(
             CustomerTable.customer_id == checkoutObj.customer_id
         )
         productObj = ProductTable.get(ProductTable.product_id == purchaseObj.product_id)
-        # print(createdTime.created_at)
         createdTime = checkoutObj.created_at
         age = customerObj.age
         sex = customerObj.sex
         product = productObj.name
         category = str(productObj.aisle_id)
-        # print(f"FOR {age} looking through {ages} bool: {age in ages}")
         if (
             createdTime is not None
             and createdTime >= startTime
@@ -667,7 +660,6 @@ def get_AllProductAndTimeDataToGraph(
             and (age in ages or sex in genders)
             and (category in productCategories or product in products)
         ):
-            # data[purchaseObj.name] += 1
             if countTypeSelected == "product":
                 data[purchaseObj.name] += 1
             else:
