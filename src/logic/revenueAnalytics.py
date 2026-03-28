@@ -174,7 +174,9 @@ def _build_checkout_contexts(
             for purchase in get_purchases_by_checkout(checkout.checkout_id):
                 product = products_by_id.get(purchase.product_id)
                 product_name = (
-                    _normalize_label(product.name, fallback=f"Unknown-{purchase.product_id}")
+                    _normalize_label(
+                        product.name, fallback=f"Unknown-{purchase.product_id}"
+                    )
                     if product is not None
                     else f"Unknown-{purchase.product_id}"
                 )
@@ -274,7 +276,9 @@ def get_revenue_dashboard(
     ]
     by_customer_age = [
         RevenueDatum(label=label, revenue=revenue)
-        for label, revenue in sorted(age_totals.items(), key=lambda item: _age_sort_key(item[0]))
+        for label, revenue in sorted(
+            age_totals.items(), key=lambda item: _age_sort_key(item[0])
+        )
     ]
     by_customer_sex = [
         RevenueDatum(label=label, revenue=revenue)
@@ -283,10 +287,7 @@ def get_revenue_dashboard(
             key=lambda item: (-item[1], item[0].lower()),
         )
     ]
-
-    peak_time_bucket = by_time[0] if by_time else None
-    if by_time:
-        peak_time_bucket = max(by_time, key=lambda datum: datum.revenue)
+    peak_time_bucket = max(by_time, key=lambda d: d.revenue) if by_time else None
 
     top_product = by_product[0] if by_product else None
     average_transaction_value = (
@@ -313,7 +314,9 @@ def get_revenue_dashboard(
                 if peak_time_bucket
                 else "No revenue data"
             ),
-            peak_time_bucket_revenue=peak_time_bucket.revenue if peak_time_bucket else 0.0,
+            peak_time_bucket_revenue=(
+                peak_time_bucket.revenue if peak_time_bucket else 0.0
+            ),
             top_product=top_product.label if top_product else "No revenue data",
             top_product_revenue=top_product.revenue if top_product else 0.0,
         ),
