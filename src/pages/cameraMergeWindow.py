@@ -379,11 +379,6 @@ def _load_image_rgba(image_path: str):
     return data
 
 
-def _black_texture_data() -> list[float]:
-    PREVIEW_TEX_DATA[:] = [0.0, 0.0, 0.0, 1.0] * (PREVIEW_TEX_WIDTH * PREVIEW_TEX_HEIGHT)
-    return PREVIEW_TEX_DATA
-
-
 def _resize_for_preview(img):
     h, w = img.shape[:2]
     if w < PREVIEW_TEX_WIDTH or h < PREVIEW_TEX_HEIGHT:
