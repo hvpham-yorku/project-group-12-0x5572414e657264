@@ -48,53 +48,27 @@ def callback_delete_video_file(sender, app_data, user_data):
     callback_refresh_table_entries(sender, app_data, user_data)
     refreshMergedImage()
 
+def _add_table_row(file, file_states):
+    with dpg.table_row(parent="videoFiles"):
+        dpg.add_text(str(file).split('/')[-1])
+        dpg.add_checkbox(
+            callback=callback_select_video_files,
+            default_value=file_states.get(file, {"state": False})["state"],
+            user_data=file,
+        )
+        for label, direction in [("Up","up"),("Down","down"),("Left","left"),("Right","right")]:
+            dpg.add_button(label=label, user_data=[direction, file], callback=callback_moveCoord)
+        dpg.add_button(label="Delete", user_data=file, callback=callback_delete_video_file)
 
 def callback_refresh_table_entries(sender, app_data, user_data):
+    file_states = user_data
+
     table_rows = dpg.get_item_children("videoFiles", 1) or []
     for row in table_rows:
         dpg.delete_item(row)
 
-    file_states = SINGLETON.get_selectedVideos()
     for file in SINGLETON.get_all_temp_files():
-        with dpg.table_row(parent="videoFiles"):
-            dpg.add_text(f"{str(file).split('/')[-1]}")
-            dpg.add_checkbox(
-                callback=callback_select_video_files,
-                default_value=file_states.get(file, {"state": False})["state"],
-                user_data=file,
-            )
-            dpg.add_button(
-                label="Up",
-                user_data=["up", file],
-                callback=callback_moveCoord,
-            )
-            dpg.add_button(
-                label="Down",
-                user_data=["down", file],
-                callback=callback_moveCoord,
-            )
-            dpg.add_button(
-                label="Left",
-                user_data=["left", file],
-                callback=callback_moveCoord,
-            )
-            dpg.add_button(
-                label="Right",
-                user_data=["right", file],
-                callback=callback_moveCoord,
-            )
-            dpg.add_button(
-                label="Delete",
-                user_data=file,
-                callback=callback_delete_video_file,
-            )
-    # for filePath in file_states.keys():
-    #     mediaEditor.extract_first_frame(filePath, SINGLETON.get_tempFolderPictures())
-    # mediaEditor.merge_and_blend_images(
-    #     [x for x in file_states.keys()],
-    #     [file_states[key]["coor"] for key in file_states.keys()],
-    #     SINGLETON.get_tempFolderPictures(),
-    # )
+        _add_table_row(file, file_states)
 
 
 def callback_video_import_dialog(sender, app_data, user_data):
