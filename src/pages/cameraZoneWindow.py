@@ -361,23 +361,23 @@ def callback_done(sender, app_data, user_data):
         logWindow.addLog(1, "No store selected. Cannot save zones.")
         return
 
-    # Replace existing zones for the store
-    for aisle in get_aisles_by_store(store_id):
-        delete_aisle(aisle.aisle_id)
-
-    for zone in ZONES:
-        add_aisle(
-            Aisle(
-                store_id=store_id,
-                bottom_left_x=int(zone["x"]),
-                bottom_left_y=int(zone["y"]),
-                top_right_x=int(zone["x"] + zone["w"]),
-                top_right_y=int(zone["y"] + zone["h"]),
-                vertical=False,
+    try:
+        for aisle in get_aisles_by_store(store_id):
+            delete_aisle(aisle.aisle_id)
+        for zone in ZONES:
+            add_aisle(
+                Aisle(
+                    store_id=store_id,
+                    bottom_left_x=int(zone["x"]),
+                    bottom_left_y=int(zone["y"]),
+                    top_right_x=int(zone["x"] + zone["w"]),
+                    top_right_y=int(zone["y"] + zone["h"]),
+                    vertical=False,
+                )
             )
-        )
-
-    logWindow.addLog(0, f"Saved {len(ZONES)} zones to store {store_id}.")
+        logWindow.addLog(0, f"Saved {len(ZONES)} zones to store {store_id}.")
+    except Exception as e:
+        logWindow.addLog(2, f"Failed to save zones: {e}")
 
 
 def create_camera_zone_window():
