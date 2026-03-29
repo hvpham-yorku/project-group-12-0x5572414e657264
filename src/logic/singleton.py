@@ -81,11 +81,37 @@ class Singleton:
     def get_databaseVideoFolder(self):
         return self._databaseVideoFolder
 
+    def _normalize_selected_video_state(self) -> None:
+        if not isinstance(self._selectedVideos, dict):
+            self._selectedVideos = {}
+            return
+
+        normalized_states = {}
+        for file, state in self._selectedVideos.items():
+            if not isinstance(state, dict):
+                normalized_states[file] = {"state": False, "coor": [0, 0]}
+                continue
+
+            coordinates = state.get("coor", [0, 0])
+            if not isinstance(coordinates, (list, tuple)) or len(coordinates) != 2:
+                coordinates = [0, 0]
+            else:
+                coordinates = [coordinates[0], coordinates[1]]
+
+            normalized_states[file] = {
+                "state": bool(state.get("state", False)),
+                "coor": coordinates,
+            }
+
+        self._selectedVideos = normalized_states
+
     def get_selectedVideos(self):
+        self._normalize_selected_video_state()
         self.get_all_temp_files()
         return self._selectedVideos
 
     def set_selectedVideo(self, video: str, state: bool) -> None:
+        self._normalize_selected_video_state()
         self.get_all_temp_files()
         self._selectedVideos[video]["state"] = state
 
@@ -94,6 +120,7 @@ class Singleton:
         direction must be "up", "down", "left", "right" only!!!!
         amount must be greather than 0
         """
+        self._normalize_selected_video_state()
         print(self._selectedVideos[video])
         amount = self._moveAmount
         if amount < 0:
@@ -121,6 +148,7 @@ class Singleton:
         print("\n\n\n")
 
     def delete_video(self, video: str) -> None:
+        self._normalize_selected_video_state()
         if video in self._selectedVideos:
             del self._selectedVideos[video]
         if os.path.exists(video):
@@ -145,6 +173,7 @@ class Singleton:
         :param recursive: If True, searches all subfolders. If False, only the top folder.
         :return: A list of file path strings.
         """
+        self._normalize_selected_video_state()
         path = self._tempFolder
         if not os.path.isdir(path):
             return []

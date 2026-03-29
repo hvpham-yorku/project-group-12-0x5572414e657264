@@ -48,13 +48,25 @@ def callback_delete_video_file(sender, app_data, user_data):
     callback_refresh_table_entries(sender, app_data, user_data)
     refreshMergedImage()
 
+
+def _get_file_states():
+    file_states = SINGLETON.get_selectedVideos()
+    if not isinstance(file_states, dict):
+        return {}
+    return file_states
+
+
 def _add_table_row(file, file_states):
-    file_states = file_states or {}
+    file_states = file_states if isinstance(file_states, dict) else {}
+    file_state = file_states.get(file)
+    if not isinstance(file_state, dict):
+        file_state = {"state": False, "coor": [0, 0]}
+
     with dpg.table_row(parent="videoFiles"):
         dpg.add_text(os.path.basename(str(file)))
         dpg.add_checkbox(
             callback=callback_select_video_files,
-            default_value=file_states.get(file, {"state": False})["state"],
+            default_value=bool(file_state.get("state", False)),
             user_data=file,
         )
         for label, direction in [("Up","up"),("Down","down"),("Left","left"),("Right","right")]:
@@ -62,7 +74,7 @@ def _add_table_row(file, file_states):
         dpg.add_button(label="Delete", user_data=file, callback=callback_delete_video_file)
 
 def callback_refresh_table_entries(sender, app_data, user_data):
-    file_states = SINGLETON.get_selectedVideos()
+    file_states = _get_file_states()
 
     table_rows = dpg.get_item_children("videoFiles", 1) or []
     for row in table_rows:
@@ -164,7 +176,7 @@ def _set_preview_texture(image_path: str) -> None:
 
 def refreshMergedImage():
 
-    file_states = SINGLETON.get_selectedVideos()
+    file_states = _get_file_states()
     out_dir = SINGLETON.get_tempFolderPictures()
     os.makedirs(out_dir, exist_ok=True)
 
@@ -197,9 +209,9 @@ def refreshMergedImage():
 def callback_moveCoord(sender, app_data, user_data):
     direction = user_data[0]
     file = user_data[1]
-    file_states = SINGLETON.get_selectedVideos()
+    file_states = _get_file_states()
 
-    if file_states[file]["state"]:
+    if file in file_states and file_states[file]["state"]:
         SINGLETON.update_selectedVideoCoordinates(file, direction)
     callback_refresh_table_entries(sender, app_data, user_data)
     refreshMergedImage()
@@ -275,40 +287,7 @@ def create_camera_merge_window():
             dpg.add_table_column(label="Left", init_width_or_weight=0.10)
             dpg.add_table_column(label="Right", init_width_or_weight=0.10)
             dpg.add_table_column(label="Delete", init_width_or_weight=0.10)
-        file_states = SINGLETON.get_selectedVideos()
-        for file in SINGLETON.get_all_temp_files():
-            with dpg.table_row(parent="videoFiles"):
-                dpg.add_text(f"{str(file).split('/')[-1]}")
-                dpg.add_checkbox(
-                    callback=callback_select_video_files,
-                    default_value=file_states.get(file, {"state": False})["state"],
-                    user_data=file,
-                )
-                dpg.add_button(
-                    label="Up",
-                    user_data=["up", file],
-                    callback=callback_moveCoord,
-                )
-                dpg.add_button(
-                    label="Down",
-                    user_data=["down", file],
-                    callback=callback_moveCoord,
-                )
-                dpg.add_button(
-                    label="Left",
-                    user_data=["left", file],
-                    callback=callback_moveCoord,
-                )
-                dpg.add_button(
-                    label="Right",
-                    user_data=["right", file],
-                    callback=callback_moveCoord,
-                )
-                dpg.add_button(
-                    label="Delete",
-                    user_data=file,
-                    callback=callback_delete_video_file,
-                )
+        callback_refresh_table_entries(None, None, None)
 
         dpg.add_spacer(height=10)
         dpg.add_image(PREVIEW_TEXTURE_TAG, tag=PREVIEW_IMAGE_WIDGET_TAG)
