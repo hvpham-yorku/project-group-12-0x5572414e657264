@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 
 # Run with:
-# python -m test.test_logic.test_customerProductAnalytics
+# python -m test.unit.src.logic.test_customerProductAnalytics
 
 
 class TestCustomerProductAnalytics(unittest.TestCase):

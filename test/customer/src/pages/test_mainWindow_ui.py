@@ -6,7 +6,7 @@ import dearpygui.dearpygui as dpg
 from src.database import model_managers as mm
 from src.database.models import Aisle, Checkout, Customer, Path, Product, Purchase, Store
 from src.pages import dataAnalyticsWindow, mainWindow
-from test.pages.gui_test_utils import GuiDbTestCase
+from test.customer.src.pages.gui_test_utils import GuiDbTestCase
 
 
 def _get_row_values(table_tag: str) -> list[list[str]]:

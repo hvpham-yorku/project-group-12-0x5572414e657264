@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-# python -m test.test_logic.test_customerAisleAnalytics
+# python -m test.unit.src.logic.test_customerAisleAnalytics
 
 
 
