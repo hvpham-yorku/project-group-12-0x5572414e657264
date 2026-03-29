@@ -106,7 +106,7 @@ def get_aisle_time_analysis(store_id: int) -> List[AisleTimeSummary]:
 
         total = sum(ct.total_time_seconds for ct in customer_time_list)
         count = len(customer_time_list)
-        avg = total / len(customers) if customers else 0.0
+        avg = total / count if count > 0 else 0.0
 
         results.append(AisleTimeSummary(
             aisle_id=aisle.aisle_id,
