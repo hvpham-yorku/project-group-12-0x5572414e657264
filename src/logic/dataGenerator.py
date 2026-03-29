@@ -27,7 +27,7 @@ import math
 import os
 import random
 import sys
-from pathlib import Path
+from pathlib import Path as FsPath
 from datetime import datetime, timedelta
 
 from src.database.models import (
@@ -329,14 +329,14 @@ def resolve_sales_csv_dir(csv_dir: str = "generated_data") -> str:
     """
     Resolve sales CSV directories while preserving the existing dev behavior.
     """
-    csv_path = Path(csv_dir).expanduser()
+    csv_path = FsPath(csv_dir).expanduser()
     if csv_path.is_absolute():
         return str(csv_path)
 
     if getattr(sys, "frozen", False):
-        return str(Path(get_data_path()).joinpath(csv_path))
+        return str(FsPath(get_data_path()).joinpath(csv_path))
 
-    return str(Path(os.getcwd()).resolve().parent.joinpath(csv_path))
+    return str(FsPath(os.getcwd()).resolve().parent.joinpath(csv_path))
 
 
 # ──────────────────────────────────────────────────────────────

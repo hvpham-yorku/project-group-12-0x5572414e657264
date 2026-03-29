@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -28,8 +29,21 @@ from ultralytics import YOLO
 
 from src.database.models import Customer, Path
 from src.database import model_managers
+from src.utils.paths import get_resource_path
 
 _COCO_PERSON_CLASS = 0
+
+
+def _resolve_model_path(model_path: str) -> str:
+    path = Path(model_path).expanduser()
+    if path.is_absolute() or path.exists():
+        return str(path)
+
+    resource_path = Path(get_resource_path(model_path))
+    if resource_path.exists():
+        return str(resource_path)
+
+    return model_path
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +287,7 @@ def track_people_in_video(
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    model = YOLO(model_path)
+    model = YOLO(_resolve_model_path(model_path))
 
     tracks_dict: Dict[int, PersonTrack] = {}
     first_seen: Dict[int, int] = {}

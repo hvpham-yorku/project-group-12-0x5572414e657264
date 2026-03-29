@@ -1,6 +1,5 @@
 # TODO Refactor into own class maybe?
 
-import ast
 import os
 import threading
 import time
@@ -19,9 +18,11 @@ from src.logic import (
     sectionTimeAnalysis,
     visualize_simulation,
 )
+from src.logic.customer_attribute_labels import AGE_LABELS, GENDER_LABELS
 from src.pages import logWindow
 from src.pages.popupWindow import display_modal_popup
 from src.logic.singleton import Singleton
+from src.utils.paths import get_resource_path
 
 START_TIME_PLACEHOLDER = "Select Start Time"
 END_TIME_PLACEHOLDER = "Select End Time"
@@ -522,37 +523,10 @@ def _load_mapping_rows(loader) -> list[list[str]]:
 
 
 def _read_customer_attribute_estimator_labels() -> tuple[list[str], list[str]]:
-    estimator_path = (
-        Path(__file__).resolve().parents[1]
-        / "logic"
-        / "customerAttributesEstimator.py"
+    return (
+        [str(label) for label in AGE_LABELS],
+        [str(label) for label in GENDER_LABELS],
     )
-
-    try:
-        parsed_module = ast.parse(estimator_path.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
-        return [], []
-
-    values = {"ageList": [], "genderList": []}
-    for node in parsed_module.body:
-        if not isinstance(node, ast.Assign):
-            continue
-
-        for target in node.targets:
-            if not isinstance(target, ast.Name):
-                continue
-            if target.id not in values:
-                continue
-
-            try:
-                raw_value = ast.literal_eval(node.value)
-            except (ValueError, SyntaxError):
-                continue
-
-            if isinstance(raw_value, list):
-                values[target.id] = [str(item) for item in raw_value]
-
-    return values["ageList"], values["genderList"]
 
 
 def _get_customer_attribute_estimator_rows() -> list[list[str]]:
@@ -1233,7 +1207,7 @@ def _get_heatmap_background_options() -> list[str]:
         "None": HEATMAP_BACKGROUND_NONE_VALUE,
     }
 
-    background_dir = Path(__file__).resolve().parents[2] / "assets" / "pictures"
+    background_dir = Path(get_resource_path("assets", "pictures"))
     if background_dir.exists():
         for image_path in sorted(background_dir.iterdir()):
             if image_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp"}:

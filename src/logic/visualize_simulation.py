@@ -9,7 +9,6 @@ Run from the project root:
 """
 
 import bisect
-import sys
 import os
 from dataclasses import dataclass
 from collections import defaultdict
@@ -18,10 +17,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-
-sys.path.insert(
-    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
 
 from src.logic.dataGenerator import (
     generate_store_and_aisles,
