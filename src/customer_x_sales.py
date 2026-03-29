@@ -17,7 +17,7 @@ def customer_conversion_function(
     #Aggregate data by hour
     #count customers
     for c in customers:
-        hour = c.exited_at.hour
+        hour = c.entered_at.hour
         customers_per_hour[hour] += 1
 
     #count checkouts and sales
