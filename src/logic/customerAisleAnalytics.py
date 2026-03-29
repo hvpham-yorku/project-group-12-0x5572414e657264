@@ -38,7 +38,7 @@ def get_product_category_most_common_gender() -> Dict[int, str]:
     }
 
     customer_id_to_gender = {
-        customer.customer_id: customer.sex
+        customer.customer_id: customer.age
         for customer in CustomerTable.select()
         if customer.sex
     }
