@@ -9,4 +9,4 @@ To compile windows exe:
 python.exe -m PyInstaller --noconfirm --clean --onefile --windowed --name StoreFlowAnalytics_1.2.1 --add-data "assets;assets" --add-data "src/assets;src/assets" --add-data "yolov8n.pt;." src\main.py
 
 To compile macOS:
-python -m PyInstaller --noconfirm --clean --onefile --windowed --name StoreFlowAnalytics_1.2.1 --add-data "assets:assets" --add-data "src/assets:src/assets" --add-data "yolov8n.pt:." src/main.py
+python -m PyInstaller --noconfirm --clean --onefile --windowed --name StoreFlowAnalytics_1.3.1 --add-data "assets:assets" --add-data "src/assets:src/assets" --add-data "yolov8n.pt:." src/main.py

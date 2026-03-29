@@ -51,7 +51,7 @@ from src.database.database_setup import (
     PurchaseTable,
     LogTable,
 )
-from src.utils.paths import get_data_path
+from src.utils.paths import get_data_path, get_executable_dir
 
 
 # ──────────────────────────────────────────────────────────────
@@ -325,18 +325,40 @@ _AISLE_COMBOS = [
 ]
 
 
-def resolve_sales_csv_dir(csv_dir: str = "generated_data") -> str:
+def resolve_sales_csv_dirs(csv_dir: str = "generated_data") -> list[str]:
     """
-    Resolve sales CSV directories while preserving the existing dev behavior.
+    Resolve one or more CSV export directories.
     """
     csv_path = FsPath(csv_dir).expanduser()
     if csv_path.is_absolute():
-        return str(csv_path)
+        return [str(csv_path)]
 
     if getattr(sys, "frozen", False):
-        return str(FsPath(get_data_path()).joinpath(csv_path))
+        candidates = [
+            FsPath(get_executable_dir()).joinpath(csv_path),
+            FsPath(get_data_path()).joinpath(csv_path),
+        ]
+        resolved: list[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            candidate_str = str(candidate)
+            if candidate_str not in seen:
+                resolved.append(candidate_str)
+                seen.add(candidate_str)
+        return resolved
 
-    return str(FsPath(os.getcwd()).resolve().parent.joinpath(csv_path))
+    return [str(FsPath(os.getcwd()).resolve().parent.joinpath(csv_path))]
+
+
+def resolve_sales_csv_dir(csv_dir: str = "generated_data") -> str:
+    """
+    Resolve the preferred sales CSV directory.
+    """
+    csv_dirs = resolve_sales_csv_dirs(csv_dir)
+    for candidate in csv_dirs:
+        if os.path.isdir(candidate):
+            return candidate
+    return csv_dirs[0]
 
 
 # ──────────────────────────────────────────────────────────────
@@ -1379,8 +1401,9 @@ def generate_and_persist(
         and ``csv_files`` (table-name -> filepath mapping; empty
         when ``include_sales_data`` is ``True``).
     """
-    csv_path = resolve_sales_csv_dir(csv_dir)
-    os.makedirs(csv_path, exist_ok=True)
+    csv_paths = resolve_sales_csv_dirs(csv_dir)
+    for csv_path in csv_paths:
+        os.makedirs(csv_path, exist_ok=True)
     store, aisles = generate_store_and_aisles(store_id)
     products = generate_products(store_id, aisles)
     customers = generate_customers(store_id, num_customers, base_date)
@@ -1498,29 +1521,33 @@ def generate_and_persist(
             ],
         )
     else:
-        product_csv = os.path.join(csv_path, "products.csv")
-        _write_to_csv(
-            product_csv,
-            products,
-            ["product_id", "store_id", "aisle_id", "name", "price", "order"],
-        )
-        csv_files["product"] = product_csv
+        for index, csv_path in enumerate(csv_paths):
+            product_csv = os.path.join(csv_path, "products.csv")
+            _write_to_csv(
+                product_csv,
+                products,
+                ["product_id", "store_id", "aisle_id", "name", "price", "order"],
+            )
+            if index == 0:
+                csv_files["product"] = product_csv
 
-        checkout_csv = os.path.join(csv_path, "checkouts.csv")
-        _write_to_csv(
-            checkout_csv,
-            checkouts,
-            ["checkout_id", "store_id", "customer_id", "total_price", "created_at"],
-        )
-        csv_files["checkout"] = checkout_csv
+            checkout_csv = os.path.join(csv_path, "checkouts.csv")
+            _write_to_csv(
+                checkout_csv,
+                checkouts,
+                ["checkout_id", "store_id", "customer_id", "total_price", "created_at"],
+            )
+            if index == 0:
+                csv_files["checkout"] = checkout_csv
 
-        purchase_csv = os.path.join(csv_path, "purchases.csv")
-        _write_to_csv(
-            purchase_csv,
-            purchases,
-            ["purchase_id", "product_id", "checkout_id", "quantity"],
-        )
-        csv_files["purchase"] = purchase_csv
+            purchase_csv = os.path.join(csv_path, "purchases.csv")
+            _write_to_csv(
+                purchase_csv,
+                purchases,
+                ["purchase_id", "product_id", "checkout_id", "quantity"],
+            )
+            if index == 0:
+                csv_files["purchase"] = purchase_csv
 
     return {
         "store": store,
@@ -1531,4 +1558,5 @@ def generate_and_persist(
         "purchases": purchases,
         "paths": paths,
         "csv_files": csv_files,
+        "csv_directories": csv_paths if not include_sales_data else [],
     }

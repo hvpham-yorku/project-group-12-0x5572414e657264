@@ -50,6 +50,12 @@ def get_data_path(*parts: str) -> str:
     return str(root.joinpath(*parts))
 
 
+def get_executable_dir() -> str:
+    if _is_frozen():
+        return str(Path(sys.executable).resolve().parent)
+    return str(Path.cwd().resolve())
+
+
 def resolve_camera_video_path(
     stored_path: str,
     database_videos_dir: str | None = None,
