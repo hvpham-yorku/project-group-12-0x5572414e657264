@@ -13,6 +13,7 @@ from src.database.model_managers import add_aisle, delete_aisle
 from src.database.models import Aisle
 from src.pages import logWindow
 from src.logic import singleton
+from src.utils.paths import resolve_camera_video_path
 
 SINGLETON = singleton.Singleton()
 DATABASE_VIDEOS_DIR = SINGLETON.get_databaseVideoFolder()
@@ -51,9 +52,13 @@ def _list_database_videos(store_id: int | None) -> list[str]:
     for cam in cameras:
         if not cam.relative_file_path:
             continue
-        label = f"{cam.camera_id} - {os.path.basename(cam.relative_file_path)}"
+        resolved_path = resolve_camera_video_path(
+            cam.relative_file_path,
+            DATABASE_VIDEOS_DIR,
+        )
+        label = f"{cam.camera_id} - {os.path.basename(resolved_path)}"
         labels.append(label)
-        VIDEO_LABEL_TO_PATH[label] = cam.relative_file_path
+        VIDEO_LABEL_TO_PATH[label] = resolved_path
     return labels
 
 

@@ -3,14 +3,31 @@ Database and Peewee table definitions.
 Call initialize_db() before performing any database operations.
 """
 
+import sys
+from pathlib import Path
+
 import peewee as pw
 
+from src.utils.paths import get_data_path
 
 db = pw.SqliteDatabase(None)
 
 
-def initialize_db(db_path: str = "store.db"):
+def get_default_db_path() -> str:
+    """
+    Use the repo-local database while developing and a writable app-data path
+    once the app is bundled.
+    """
+    if getattr(sys, "frozen", False):
+        return get_data_path("store.db")
+    return str(Path(__file__).resolve().with_name("store.db"))
+
+
+def initialize_db(db_path: str | None = None):
     """Initialize the database connection and create all tables."""
+    if db_path is None:
+        db_path = get_default_db_path()
+
     db.init(db_path)
     db.connect()
     db.create_tables(

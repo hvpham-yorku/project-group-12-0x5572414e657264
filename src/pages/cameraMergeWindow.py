@@ -129,8 +129,8 @@ def callback_merge_selected_videos(sender, app_data, user_data):
 
     try:
         mediaEditor.merge_and_blend_videos(video_paths, coordinates, output_path)
-        relative_path = os.path.relpath(output_path, os.getcwd())
-        add_camera(Camera(store_id=store_id, relative_file_path=relative_path))
+        persisted_path = os.path.normpath(os.path.abspath(output_path))
+        add_camera(Camera(store_id=store_id, relative_file_path=persisted_path))
         logWindow.addLog(0, f"Merged video saved to {output_path}")
     except Exception as exc:
         logWindow.addLog(2, f"Failed to merge videos: {exc}")

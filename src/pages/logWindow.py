@@ -8,6 +8,7 @@ import random
 
 from src.database.model_managers import add_log
 from src.database.models import Log
+from src.utils.paths import get_resource_path
 
 # TODO ADD A BUTTON TO CLEAR LOGS
 
@@ -93,21 +94,67 @@ def _play_warning_sound() -> None:
         pass
 
 
-def _play_customSound(severity: int = 0):
+def _play_audio_file(sound_path: str) -> bool:
     try:
-        # get sounds
-        path = "src/assets/audio/warningSounds"
-        fullPath = os.path.join(os.getcwd(), path)
+        system = platform.system()
+        suffix = os.path.splitext(sound_path)[1].lower()
+
+        if system == "Windows" and suffix == ".wav":
+            import winsound
+
+            winsound.PlaySound(
+                sound_path,
+                winsound.SND_ASYNC | winsound.SND_FILENAME,
+            )
+            return True
+
+        if system == "Darwin" and shutil.which("afplay"):
+            subprocess.Popen(["afplay", sound_path])
+            return True
+
+        if shutil.which("ffplay"):
+            subprocess.Popen(
+                [
+                    "ffplay",
+                    "-nodisp",
+                    "-autoexit",
+                    "-loglevel",
+                    "quiet",
+                    sound_path,
+                ]
+            )
+            return True
+
+        if shutil.which("paplay"):
+            subprocess.Popen(["paplay", sound_path])
+            return True
+
+        if shutil.which("aplay") and suffix == ".wav":
+            subprocess.Popen(["aplay", sound_path])
+            return True
+    except Exception:
+        return False
+
+    return False
+
+
+def _play_customSound(severity: int = 0):
+    soundPath = ""
+    try:
+        fullPath = get_resource_path("src", "assets", "audio", "warningSounds")
         file_names = []
         if os.path.exists(fullPath):
+            allowed_exts = (".wav",) if platform.system() == "Windows" else (
+                ".mp3",
+                ".wav",
+                ".aiff",
+                ".ogg",
+            )
             file_names = [
                 entry.name
                 for entry in os.scandir(fullPath)
-                if entry.is_file() and entry.name.lower().endswith((".mp3", ".wav", ".aiff", ".ogg"))
+                if entry.is_file() and entry.name.lower().endswith(allowed_exts)
             ]
-            # print("Files found:", file_names)
-        else:
-            print("That folder doesn't exist yet!")
 
         if not file_names:
             _play_warning_sound()
@@ -116,11 +163,11 @@ def _play_customSound(severity: int = 0):
         soundPath = os.path.join(
             fullPath, file_names[random.randint(0, len(file_names) - 1)]
         )
-        if os.path.exists(soundPath):
-            subprocess.Popen(["afplay", soundPath])
+        if os.path.exists(soundPath) and _play_audio_file(soundPath):
+            return
+
+        _play_warning_sound()
     except Exception as e:
-        print(f"Sound played was: {soundPath}")
-        print(e)
         _play_warning_sound()
 
 

@@ -14,6 +14,7 @@ import os
 from dataclasses import dataclass
 from collections import defaultdict
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -37,6 +38,7 @@ from src.logic.dataGenerator import (
     AISLE_CATEGORIES,
     SHELF_DEPTH,
 )
+from src.utils.paths import get_data_path
 
 # ── Video settings ────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ COL_DOT = (210, 140, 30)
 COL_TEXT = (50, 50, 50)
 COL_BG = (250, 250, 248)
 
-OUTPUT_FILE = "store_simulation.mp4"
+OUTPUT_FILE = get_data_path("videos", "store_simulation.mp4")
 
 
 @dataclass(frozen=True)
@@ -192,8 +194,14 @@ def draw_background(aisles) -> np.ndarray:
         label = AISLE_CATEGORIES[i]["name"]
         sz = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)[0]
         cv2.putText(
-            img, label, (cx_px - sz[0] // 2, label_y),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.35, COL_TEXT, 1, cv2.LINE_AA,
+            img,
+            label,
+            (cx_px - sz[0] // 2, label_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.35,
+            COL_TEXT,
+            1,
+            cv2.LINE_AA,
         )
 
     for x in CHECKOUT_X_POSITIONS:
@@ -204,20 +212,36 @@ def draw_background(aisles) -> np.ndarray:
         cp = grid_to_px(x, CHECKOUT_Y)
         sz = cv2.getTextSize("C", cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)[0]
         cv2.putText(
-            img, "C", (cp[0] - sz[0] // 2, cp[1] + sz[1] // 2),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1, cv2.LINE_AA,
+            img,
+            "C",
+            (cp[0] - sz[0] // 2, cp[1] + sz[1] // 2),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.35,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
         )
 
     ep = grid_to_px(ENTRANCE_X, ENTRANCE_Y)
     cv2.arrowedLine(
-        img, (ep[0], ep[1] + 25), (ep[0], ep[1] + 5),
-        COL_ENTRANCE, 2, tipLength=0.4,
+        img,
+        (ep[0], ep[1] + 25),
+        (ep[0], ep[1] + 5),
+        COL_ENTRANCE,
+        2,
+        tipLength=0.4,
     )
     lbl = "ENTRANCE / EXIT"
     sz = cv2.getTextSize(lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
     cv2.putText(
-        img, lbl, (ep[0] - sz[0] // 2, ep[1] + 40),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.4, COL_ENTRANCE, 1, cv2.LINE_AA,
+        img,
+        lbl,
+        (ep[0] - sz[0] // 2, ep[1] + 40),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.4,
+        COL_ENTRANCE,
+        1,
+        cv2.LINE_AA,
     )
 
     return img
@@ -225,6 +249,7 @@ def draw_background(aisles) -> np.ndarray:
 
 def render_simulation(progress_callback=None) -> SimulationRenderResult:
     _emit_progress(progress_callback, 0.0, "Starting simulation render...")
+    Path(OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
 
     store, aisles = generate_store_and_aisles()
     products = generate_products(store.store_id, aisles)
@@ -234,7 +259,9 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
     _emit_progress(progress_callback, 0.16, "Generated customers.")
 
     checkouts, purchases = generate_checkouts_and_purchases(
-        store.store_id, customers, products,
+        store.store_id,
+        customers,
+        products,
     )
     _emit_progress(progress_callback, 0.24, "Generated checkouts and purchases.")
 
@@ -341,12 +368,24 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
 
         time_str = cur_time.strftime("%I:%M %p")
         cv2.putText(
-            frame, time_str, (IMG_W - 175, 35),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.75, COL_TEXT, 2, cv2.LINE_AA,
+            frame,
+            time_str,
+            (IMG_W - 175, 35),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.75,
+            COL_TEXT,
+            2,
+            cv2.LINE_AA,
         )
         cv2.putText(
-            frame, f"Customers: {count}", (15, 35),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.55, COL_TEXT, 1, cv2.LINE_AA,
+            frame,
+            f"Customers: {count}",
+            (15, 35),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            COL_TEXT,
+            1,
+            cv2.LINE_AA,
         )
 
         writer.write(frame)

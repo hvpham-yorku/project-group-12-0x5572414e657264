@@ -16,7 +16,9 @@ import webbrowser
 from src.logic.dataGenerator import (
     generate_and_persist,
     import_sales_data_from_csv_dir,
+    resolve_sales_csv_dir,
 )
+from src.utils.paths import resolve_camera_video_path
 from src.pages.dataAnalyticsWindow import (
     GRAPH_PIE_TAB_TAG,
     GRAPH_VIEW_TAB_BAR_TAG,
@@ -97,7 +99,7 @@ def callback_populateDataBaseWithDemoDataNoSales(sender, app_data, user_data):
 
 def _select_csv_import_directory() -> str | None:
     prompt = "Select the folder containing products.csv, checkouts.csv, and purchases.csv:"
-    default_dir = os.path.abspath("generated_data")
+    default_dir = resolve_sales_csv_dir("generated_data")
 
     if platform.system() == "Darwin":
         script = f'POSIX path of (choose folder with prompt "{prompt}")'
@@ -152,8 +154,7 @@ def delete_orphaned_database_videos(sender, app_data, user_data):
     for cam in get_all_cameras():
         if not cam.relative_file_path:
             continue
-        path = cam.relative_file_path
-        abs_path = path if os.path.isabs(path) else os.path.abspath(path)
+        abs_path = resolve_camera_video_path(cam.relative_file_path, folder)
         db_paths.add(os.path.normpath(abs_path))
 
     deleted = []

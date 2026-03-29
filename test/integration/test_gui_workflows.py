@@ -82,9 +82,8 @@ class TestGuiWorkflows(GuiDbTestCase):
             self.database_videos_dir,
             "merged_20260102_030405.mp4",
         )
-        expected_relative_path = os.path.relpath(expected_output, os.getcwd())
         self.assertEqual(cameras[0].store_id, store.store_id)
-        self.assertEqual(cameras[0].relative_file_path, expected_relative_path)
+        self.assertEqual(cameras[0].relative_file_path, expected_output)
         self.assertTrue(os.path.exists(expected_output))
         expected_label = (
             f"{cameras[0].camera_id} - {os.path.basename(cameras[0].relative_file_path)}"

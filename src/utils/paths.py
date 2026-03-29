@@ -48,3 +48,34 @@ def get_data_root() -> Path:
 def get_data_path(*parts: str) -> str:
     root = get_data_root()
     return str(root.joinpath(*parts))
+
+
+def resolve_camera_video_path(
+    stored_path: str,
+    database_videos_dir: str | None = None,
+) -> str:
+    """
+    Resolve persisted camera video paths across dev, bundled, and legacy records.
+    """
+    path = Path(stored_path).expanduser()
+    if path.is_absolute():
+        return str(path.resolve(strict=False))
+
+    candidates = [
+        Path.cwd() / path,
+        Path(get_resource_path()).joinpath(path),
+    ]
+
+    if database_videos_dir:
+        db_dir = Path(database_videos_dir)
+        candidates.append(db_dir / path)
+        candidates.append(db_dir / path.name)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate.resolve(strict=False))
+
+    if database_videos_dir:
+        return str((Path(database_videos_dir) / path.name).resolve(strict=False))
+
+    return str((Path.cwd() / path).resolve(strict=False))

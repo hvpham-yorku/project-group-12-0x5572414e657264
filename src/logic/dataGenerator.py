@@ -26,6 +26,8 @@ import csv
 import math
 import os
 import random
+import sys
+from pathlib import Path
 from datetime import datetime, timedelta
 
 from src.database.models import (
@@ -49,6 +51,7 @@ from src.database.database_setup import (
     PurchaseTable,
     LogTable,
 )
+from src.utils.paths import get_data_path
 
 
 # ──────────────────────────────────────────────────────────────
@@ -320,6 +323,20 @@ _AISLE_COMBOS = [
     [1, 3],  # Canned Goods + Beverages
     [0, 2, 3, 4],  # Bakery + Snacks + Beverages + Dairy
 ]
+
+
+def resolve_sales_csv_dir(csv_dir: str = "generated_data") -> str:
+    """
+    Resolve sales CSV directories while preserving the existing dev behavior.
+    """
+    csv_path = Path(csv_dir).expanduser()
+    if csv_path.is_absolute():
+        return str(csv_path)
+
+    if getattr(sys, "frozen", False):
+        return str(Path(get_data_path()).joinpath(csv_path))
+
+    return str(Path(os.getcwd()).resolve().parent.joinpath(csv_path))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -1032,7 +1049,7 @@ def _write_to_csv(filepath: str, items: list, fieldnames: list[str]) -> None:
     dir_name = os.path.dirname(filepath)
     if dir_name:
         os.makedirs(dir_name, exist_ok=True)
-    with open(filepath, "w", newline="") as fh:
+    with open(filepath, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         for item in items:
@@ -1159,8 +1176,7 @@ def _read_sales_csv(
 
 def _get_existing_ids(table_cls, id_field: str) -> set[int]:
     return {
-        getattr(row, id_field)
-        for row in table_cls.select(getattr(table_cls, id_field))
+        getattr(row, id_field) for row in table_cls.select(getattr(table_cls, id_field))
     }
 
 
@@ -1289,7 +1305,7 @@ def import_sales_data_from_csv_dir(csv_dir: str) -> dict[str, int]:
     ``generate_and_persist(include_sales_data=False)``:
     ``products.csv``, ``checkouts.csv``, and ``purchases.csv``.
     """
-    csv_dir = os.path.abspath(csv_dir)
+    csv_dir = resolve_sales_csv_dir(csv_dir)
     if not os.path.isdir(csv_dir):
         raise FileNotFoundError(f"CSV directory not found: {csv_dir}")
 
@@ -1363,6 +1379,8 @@ def generate_and_persist(
         and ``csv_files`` (table-name -> filepath mapping; empty
         when ``include_sales_data`` is ``True``).
     """
+    csv_path = resolve_sales_csv_dir(csv_dir)
+    os.makedirs(csv_path, exist_ok=True)
     store, aisles = generate_store_and_aisles(store_id)
     products = generate_products(store_id, aisles)
     customers = generate_customers(store_id, num_customers, base_date)
@@ -1480,7 +1498,7 @@ def generate_and_persist(
             ],
         )
     else:
-        product_csv = os.path.join(csv_dir, "products.csv")
+        product_csv = os.path.join(csv_path, "products.csv")
         _write_to_csv(
             product_csv,
             products,
@@ -1488,7 +1506,7 @@ def generate_and_persist(
         )
         csv_files["product"] = product_csv
 
-        checkout_csv = os.path.join(csv_dir, "checkouts.csv")
+        checkout_csv = os.path.join(csv_path, "checkouts.csv")
         _write_to_csv(
             checkout_csv,
             checkouts,
@@ -1496,7 +1514,7 @@ def generate_and_persist(
         )
         csv_files["checkout"] = checkout_csv
 
-        purchase_csv = os.path.join(csv_dir, "purchases.csv")
+        purchase_csv = os.path.join(csv_path, "purchases.csv")
         _write_to_csv(
             purchase_csv,
             purchases,
