@@ -6,7 +6,7 @@ coordinate, then generates an annotated output video where each person
 is drawn with a unique colour, a trailing path polyline, and an ID label.
 
 Usage (from project root):
-    python -m test.logic.test_video_tracker
+    python -m test.unit.src.logic.test_video_tracker
 """
 
 from __future__ import annotations

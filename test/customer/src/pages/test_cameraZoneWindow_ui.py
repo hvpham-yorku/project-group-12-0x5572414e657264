@@ -6,7 +6,7 @@ import dearpygui.dearpygui as dpg
 from src.database import model_managers as mm
 from src.database.models import Aisle, Camera, Store
 from src.pages import cameraZoneWindow
-from test.pages.gui_test_utils import GuiDbTestCase
+from test.customer.src.pages.gui_test_utils import GuiDbTestCase
 
 
 class TestCameraZoneWindowUI(GuiDbTestCase):

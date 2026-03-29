@@ -18,7 +18,6 @@ from src.logic import (
     sectionTimeAnalysis,
     visualize_simulation,
 )
-from src.logic.customer_attribute_labels import AGE_LABELS, GENDER_LABELS
 from src.pages import logWindow
 from src.pages.popupWindow import display_modal_popup
 from src.logic.singleton import Singleton
@@ -34,7 +33,6 @@ GRAPH_REVENUE_TAB_TAG = "graph_revenue_tab"
 GRAPH_SIMULATION_TAB_TAG = "graph_simulation_tab"
 ANALYTICS_DATA_TAB_BAR_TAG = "analytics_data_tab_bar"
 ANALYTICS_CUSTOMER_AISLE_TAB_TAG = "analytics_customer_aisle_tab"
-ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG = "analytics_customer_attributes_tab"
 ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG = "analytics_customer_product_tab"
 ANALYTICS_SECTION_TIME_TAB_TAG = "analytics_section_time_tab"
 ANALYTICS_BASKET_TAB_TAG = "analytics_basket_tab"
@@ -53,7 +51,6 @@ CUSTOMER_AISLE_GENDER_TABLE_TAG = "customer_aisle_gender_table"
 CUSTOMER_AISLE_AGE_TABLE_TAG = "customer_aisle_age_table"
 CUSTOMER_PRODUCT_GENDER_TABLE_TAG = "customer_product_gender_table"
 CUSTOMER_PRODUCT_AGE_TABLE_TAG = "customer_product_age_table"
-CUSTOMER_ATTRIBUTES_TABLE_TAG = "customer_attributes_estimator_table"
 SECTION_TIME_TABLE_TAG = "section_time_analysis_table"
 BASKET_SUMMARY_TABLE_TAG = "basket_analysis_summary_table"
 BASKET_PRODUCTS_TABLE_TAG = "basket_analysis_products_table"
@@ -61,9 +58,6 @@ BASKET_PAIRS_TABLE_TAG = "basket_analysis_pairs_table"
 CUSTOMER_AISLE_REFRESH_BUTTON_TAG = "customer_aisle_refresh_button"
 CUSTOMER_AISLE_PROGRESS_TAG = "customer_aisle_refresh_progress"
 CUSTOMER_AISLE_STATUS_TAG = "customer_aisle_refresh_status"
-CUSTOMER_ATTRIBUTES_REFRESH_BUTTON_TAG = "customer_attributes_refresh_button"
-CUSTOMER_ATTRIBUTES_PROGRESS_TAG = "customer_attributes_refresh_progress"
-CUSTOMER_ATTRIBUTES_STATUS_TAG = "customer_attributes_refresh_status"
 CUSTOMER_PRODUCT_REFRESH_BUTTON_TAG = "customer_product_refresh_button"
 CUSTOMER_PRODUCT_PROGRESS_TAG = "customer_product_refresh_progress"
 CUSTOMER_PRODUCT_STATUS_TAG = "customer_product_refresh_status"
@@ -83,6 +77,9 @@ REVENUE_TIME_VIEW_TAB_BAR_TAG = "revenue_time_view_tab_bar"
 REVENUE_TIME_LINE_TAB_TAG = "revenue_time_line_tab"
 REVENUE_TIME_BAR_TAB_TAG = "revenue_time_bar_tab"
 REVENUE_TIME_TABLE_TAB_TAG = "revenue_time_table_tab"
+REVENUE_PRODUCT_VIEW_TAB_BAR_TAG = "revenue_product_view_tab_bar"
+REVENUE_PRODUCT_BAR_TAB_TAG = "revenue_product_bar_tab"
+REVENUE_PRODUCT_PIE_TAB_TAG = "revenue_product_pie_tab"
 REVENUE_REFRESH_BUTTON_TAG = "revenue_refresh_button"
 REVENUE_STATUS_TAG = "revenue_status_text"
 REVENUE_TIME_GRANULARITY_TAG = "revenue_time_granularity"
@@ -235,15 +232,6 @@ _ANALYTICS_REFRESH_CONFIG = {
         "status_tag": CUSTOMER_AISLE_STATUS_TAG,
         "ready_status": "Ready to refresh customer aisle analytics.",
         "complete_status": "Customer aisle analytics refreshed.",
-    },
-    "customer_attributes": {
-        "tab_tag": ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG,
-        "table_tag": CUSTOMER_ATTRIBUTES_TABLE_TAG,
-        "button_tag": CUSTOMER_ATTRIBUTES_REFRESH_BUTTON_TAG,
-        "progress_tag": CUSTOMER_ATTRIBUTES_PROGRESS_TAG,
-        "status_tag": CUSTOMER_ATTRIBUTES_STATUS_TAG,
-        "ready_status": "Ready to refresh customer attribute estimator data.",
-        "complete_status": "Customer attribute estimator data refreshed.",
     },
     "customer_product": {
         "tab_tag": ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
@@ -522,28 +510,6 @@ def _load_mapping_rows(loader) -> list[list[str]]:
         return [[f"Failed to load data: {exc}", ""]]
 
 
-def _read_customer_attribute_estimator_labels() -> tuple[list[str], list[str]]:
-    return (
-        [str(label) for label in AGE_LABELS],
-        [str(label) for label in GENDER_LABELS],
-    )
-
-
-def _get_customer_attribute_estimator_rows() -> list[list[str]]:
-    age_labels, gender_labels = _read_customer_attribute_estimator_labels()
-    rows = []
-    rows.extend([["Age Range", label] for label in age_labels])
-    rows.extend([["Gender Label", label] for label in gender_labels])
-    return rows
-
-
-def _load_customer_attribute_estimator_rows() -> list[list[str]]:
-    try:
-        return _get_customer_attribute_estimator_rows()
-    except Exception as exc:
-        return [[f"Failed to load data: {exc}", ""]]
-
-
 def _get_section_time_analysis_rows() -> list[list[str]]:
     rows = []
     for store in get_all_stores():
@@ -690,34 +656,6 @@ def _build_customer_aisle_analysis_payload(
         CUSTOMER_AISLE_AGE_TABLE_TAG: (
             age_rows,
             "No aisle age analytics available.",
-            2,
-        ),
-    }
-
-
-def _build_customer_attribute_analysis_payload(
-    progress_callback=None,
-) -> dict[str, tuple[list[list[str]], str, int]]:
-    _emit_local_progress(
-        progress_callback,
-        0.05,
-        "Reading estimator label definitions...",
-    )
-    estimator_rows = _load_customer_attribute_estimator_rows()
-    _emit_local_progress(
-        progress_callback,
-        0.90,
-        f"Loaded {len(estimator_rows):,} attribute estimator rows.",
-    )
-    _emit_local_progress(
-        progress_callback,
-        1.0,
-        _ANALYTICS_REFRESH_CONFIG["customer_attributes"]["complete_status"],
-    )
-    return {
-        CUSTOMER_ATTRIBUTES_TABLE_TAG: (
-            estimator_rows,
-            "No estimator labels available.",
             2,
         ),
     }
@@ -913,7 +851,6 @@ def _build_basket_analysis_payload(
 
 _ANALYTICS_REFRESH_BUILDERS = {
     "customer_aisle": _build_customer_aisle_analysis_payload,
-    "customer_attributes": _build_customer_attribute_analysis_payload,
     "customer_product": _build_customer_product_analysis_payload,
     "section_time": _build_section_time_analysis_payload,
     "basket": _build_basket_analysis_payload,
@@ -3089,26 +3026,6 @@ def create_analytics_data_view(parent: str) -> None:
                         )
 
             with dpg.tab(
-                label="customerAttributesEstimator.py",
-                tag=ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG,
-            ):
-                _create_analytics_refresh_controls(
-                    CUSTOMER_ATTRIBUTES_REFRESH_BUTTON_TAG,
-                    CUSTOMER_ATTRIBUTES_PROGRESS_TAG,
-                    CUSTOMER_ATTRIBUTES_STATUS_TAG,
-                    "Refresh customerAttributesEstimator.py",
-                    "customer_attributes",
-                    "Reload the estimator labels defined in the module.",
-                )
-                dpg.add_spacer(height=6)
-                dpg.add_text("Estimator label sets declared in the module")
-                _add_stretch_table(
-                    CUSTOMER_ATTRIBUTES_TABLE_TAG,
-                    ["Label Type", "Value"],
-                    ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG,
-                )
-
-            with dpg.tab(
                 label="customerProductAnalytics.py",
                 tag=ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG,
             ):
@@ -3692,25 +3609,29 @@ def create_revenue_analytics_view(parent: str) -> None:
                                     wrap=220,
                                 )
                         with dpg.table_cell():
-                            with dpg.table(
-                                policy=dpg.mvTable_SizingStretchProp,
-                                header_row=False,
-                            ):
-                                dpg.add_table_column()
-                                dpg.add_table_column()
-                                with dpg.table_row():
-                                    with dpg.table_cell():
-                                        _create_xy_revenue_plot(
-                                            None,
-                                            "revenue_product_bar",
-                                            "Revenue by Product (Bar)",
-                                        )
-                                    with dpg.table_cell():
-                                        _create_pie_revenue_plot(
-                                            None,
-                                            "revenue_product_pie",
-                                            "Revenue by Product (Pie)",
-                                        )
+                            dpg.add_text(
+                                "Toggle between the product revenue charts."
+                            )
+                            dpg.add_spacer(height=6)
+                            with dpg.tab_bar(tag=REVENUE_PRODUCT_VIEW_TAB_BAR_TAG):
+                                with dpg.tab(
+                                    label="Bar Chart",
+                                    tag=REVENUE_PRODUCT_BAR_TAB_TAG,
+                                ):
+                                    _create_xy_revenue_plot(
+                                        REVENUE_PRODUCT_BAR_TAB_TAG,
+                                        "revenue_product_bar",
+                                        "Revenue by Product (Bar)",
+                                    )
+                                with dpg.tab(
+                                    label="Pie Chart",
+                                    tag=REVENUE_PRODUCT_PIE_TAB_TAG,
+                                ):
+                                    _create_pie_revenue_plot(
+                                        REVENUE_PRODUCT_PIE_TAB_TAG,
+                                        "revenue_product_pie",
+                                        "Revenue by Product (Pie)",
+                                    )
                 dpg.add_spacer(height=6)
                 _add_stretch_table(
                     REVENUE_PRODUCT_TABLE_TAG,
