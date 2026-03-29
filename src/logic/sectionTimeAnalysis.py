@@ -138,31 +138,11 @@ def get_section_time_analysis(store_id: int) -> List[SectionTimeSummary]:
             next_point = valid_paths[i + 1]
 
             for aisle in eligible_aisles:
-                min_x = min(aisle.bottom_left_x, aisle.top_right_x)
-                max_x = max(aisle.bottom_left_x, aisle.top_right_x)
-                min_y = min(aisle.bottom_left_y, aisle.top_right_y)
-                max_y = max(aisle.bottom_left_y, aisle.top_right_y)
-
-                if (min_x <= current.location_x <= max_x
-                        and min_y <= current.location_y <= max_y):
-                    num_sections = aisle_num_sections[aisle.aisle_id]
-                    if aisle.vertical:
-                        lo = min(aisle.bottom_left_y, aisle.top_right_y)
-                        hi = max(aisle.bottom_left_y, aisle.top_right_y)
-                        coord = current.location_y
-                    else:
-                        lo = min(aisle.bottom_left_x, aisle.top_right_x)
-                        hi = max(aisle.bottom_left_x, aisle.top_right_x)
-                        coord = current.location_x
-
-                    span = hi - lo
-                    if span == 0:
-                        section = 1
-                    else:
-                        section_size = span / num_sections
-                        section = int((coord - lo) / section_size) + 1
-                        section = max(1, min(section, num_sections))
-
+                if _point_in_aisle(current.location_x, current.location_y, aisle):
+                    section = _get_section_index(
+                        current.location_x, current.location_y,
+                        aisle, aisle_num_sections[aisle.aisle_id],
+                    )
                     dt = (next_point.timestamp - current.timestamp).total_seconds()
                     if dt > 0:
                         time_map[(aisle.aisle_id, section)][customer.customer_id] += dt
