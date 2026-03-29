@@ -49,8 +49,9 @@ def callback_delete_video_file(sender, app_data, user_data):
     refreshMergedImage()
 
 def _add_table_row(file, file_states):
+    file_states = file_states or {}
     with dpg.table_row(parent="videoFiles"):
-        dpg.add_text(str(file).split('/')[-1])
+        dpg.add_text(os.path.basename(str(file)))
         dpg.add_checkbox(
             callback=callback_select_video_files,
             default_value=file_states.get(file, {"state": False})["state"],
@@ -61,7 +62,7 @@ def _add_table_row(file, file_states):
         dpg.add_button(label="Delete", user_data=file, callback=callback_delete_video_file)
 
 def callback_refresh_table_entries(sender, app_data, user_data):
-    file_states = user_data
+    file_states = SINGLETON.get_selectedVideos()
 
     table_rows = dpg.get_item_children("videoFiles", 1) or []
     for row in table_rows:
