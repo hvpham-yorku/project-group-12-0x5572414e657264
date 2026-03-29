@@ -114,10 +114,22 @@ def _select_csv_import_directory() -> str | None:
     root.withdraw()
     root.wm_attributes("-topmost", 1)
     try:
-        selected_dir = filedialog.askdirectory(
-            title="Select generated sales CSV folder",
-            initialdir=default_dir if os.path.isdir(default_dir) else os.getcwd(),
-        )
+        initial_dir = default_dir if os.path.isdir(default_dir) else os.getcwd()
+        if platform.system() == "Windows":
+            selected_file = filedialog.askopenfilename(
+                title="Select any generated sales CSV file",
+                initialdir=initial_dir,
+                filetypes=(
+                    ("CSV files", "*.csv"),
+                    ("All files", "*.*"),
+                ),
+            )
+            selected_dir = os.path.dirname(selected_file) if selected_file else ""
+        else:
+            selected_dir = filedialog.askdirectory(
+                title="Select generated sales CSV folder",
+                initialdir=initial_dir,
+            )
     finally:
         root.destroy()
 
