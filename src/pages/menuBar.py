@@ -6,7 +6,18 @@ from src.logic import singleton
 from src.pages import cameraZoneWindow
 from src.pages import addStorePopup
 from src.pages import wipeDatabasePopup
+from src.pages.popupWindow import display_modal_popup
 from src.database.model_managers import get_all_cameras
+from src.database.database_setup import (
+    StoreTable,
+    CustomerTable,
+    AisleTable,
+    ProductTable,
+    CameraTable,
+    PathTable,
+    CheckoutTable,
+    PurchaseTable,
+)
 import os
 import tkinter as tk
 from tkinter import filedialog
@@ -28,6 +39,10 @@ from src.pages.dataAnalyticsWindow import (
 )
 
 SINGLETON = singleton.Singleton()
+_DEMO_DATABASE_IMPORT_ERROR_MESSAGE = (
+    "I TOLD YOU TO WIPE DATABASE BEFORE IMPORTING DEMO DATA!!!! "
+    "\N{POUTING FACE}"
+)
 
 
 def feature_not_implemented(sender):
@@ -87,14 +102,38 @@ def _refresh_data_analysis_window() -> None:
         dpg.set_value(GRAPH_VIEW_TAB_BAR_TAG, GRAPH_PIE_TAB_TAG)
 
 
-def callback_populateDataBaseWithDemoData(sender, app_data, user_data):
-    generate_and_persist(include_sales_data=True)
+def _database_requires_wipe_before_demo_import() -> bool:
+    tables_to_check = (
+        StoreTable,
+        CustomerTable,
+        AisleTable,
+        ProductTable,
+        CameraTable,
+        PathTable,
+        CheckoutTable,
+        PurchaseTable,
+    )
+    return any(
+        table.select(table._meta.primary_key).limit(1).first() is not None
+        for table in tables_to_check
+    )
+
+
+def _attempt_demo_import(*, include_sales_data: bool) -> None:
+    if _database_requires_wipe_before_demo_import():
+        display_modal_popup(2, _DEMO_DATABASE_IMPORT_ERROR_MESSAGE)
+        return
+
+    generate_and_persist(include_sales_data=include_sales_data)
     _refresh_data_analysis_window()
+
+
+def callback_populateDataBaseWithDemoData(sender, app_data, user_data):
+    _attempt_demo_import(include_sales_data=True)
 
 
 def callback_populateDataBaseWithDemoDataNoSales(sender, app_data, user_data):
-    generate_and_persist(include_sales_data=False)
-    _refresh_data_analysis_window()
+    _attempt_demo_import(include_sales_data=False)
 
 
 def _select_csv_import_directory() -> str | None:

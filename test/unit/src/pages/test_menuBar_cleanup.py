@@ -31,6 +31,47 @@ class TestMenuBarCleanup(unittest.TestCase):
                 self.assertFalse(os.path.exists(orphan_path))
                 add_log.assert_called()
 
+    def test_demo_import_callback_uses_sales_mode(self):
+        with patch("src.pages.menuBar._attempt_demo_import") as attempt_demo_import:
+            menuBar.callback_populateDataBaseWithDemoData(None, None, None)
+
+        attempt_demo_import.assert_called_once_with(include_sales_data=True)
+
+    def test_demo_import_no_sales_callback_uses_no_sales_mode(self):
+        with patch("src.pages.menuBar._attempt_demo_import") as attempt_demo_import:
+            menuBar.callback_populateDataBaseWithDemoDataNoSales(None, None, None)
+
+        attempt_demo_import.assert_called_once_with(include_sales_data=False)
+
+    def test_attempt_demo_import_blocks_when_database_not_wiped(self):
+        with patch(
+            "src.pages.menuBar._database_requires_wipe_before_demo_import",
+            return_value=True,
+        ), patch("src.pages.menuBar.display_modal_popup") as popup, patch(
+            "src.pages.menuBar.generate_and_persist"
+        ) as generate_and_persist, patch(
+            "src.pages.menuBar._refresh_data_analysis_window"
+        ) as refresh:
+            menuBar._attempt_demo_import(include_sales_data=True)
+
+        popup.assert_called_once_with(
+            2, menuBar._DEMO_DATABASE_IMPORT_ERROR_MESSAGE
+        )
+        generate_and_persist.assert_not_called()
+        refresh.assert_not_called()
+
+    def test_attempt_demo_import_runs_when_database_is_clean(self):
+        with patch(
+            "src.pages.menuBar._database_requires_wipe_before_demo_import",
+            return_value=False,
+        ), patch("src.pages.menuBar.generate_and_persist") as generate_and_persist, patch(
+            "src.pages.menuBar._refresh_data_analysis_window"
+        ) as refresh:
+            menuBar._attempt_demo_import(include_sales_data=False)
+
+        generate_and_persist.assert_called_once_with(include_sales_data=False)
+        refresh.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()

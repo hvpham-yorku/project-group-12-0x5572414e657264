@@ -62,9 +62,14 @@ class TestMainWindowUI(GuiDbTestCase):
         self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_AISLE_AGE_TAB_TAG)
         )
-        self.assertTrue(
-            dpg.does_item_exist(dataAnalyticsWindow.ANALYTICS_CUSTOMER_ATTRIBUTES_TAB_TAG)
-        )
+        analytics_subtab_labels = [
+            dpg.get_item_label(item)
+            for item in dpg.get_item_children(
+                dataAnalyticsWindow.ANALYTICS_DATA_TAB_BAR_TAG, 1
+            )
+            or []
+        ]
+        self.assertNotIn("customerAttributesEstimator.py", analytics_subtab_labels)
         self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.ANALYTICS_CUSTOMER_PRODUCT_TAB_TAG)
         )
@@ -108,9 +113,6 @@ class TestMainWindowUI(GuiDbTestCase):
             dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_AISLE_PROGRESS_TAG)
         )
         self.assertTrue(
-            dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_ATTRIBUTES_PROGRESS_TAG)
-        )
-        self.assertTrue(
             dpg.does_item_exist(dataAnalyticsWindow.CUSTOMER_PRODUCT_PROGRESS_TAG)
         )
         self.assertTrue(
@@ -124,12 +126,17 @@ class TestMainWindowUI(GuiDbTestCase):
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_AGE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_SEX_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_VIEW_TAB_BAR_TAG))
+        self.assertTrue(
+            dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_VIEW_TAB_BAR_TAG)
+        )
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_GRANULARITY_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_WINDOW_START_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_WINDOW_END_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_LINE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_BAR_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_TABLE_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_BAR_TAB_TAG))
+        self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_PRODUCT_PIE_TAB_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_REFRESH_BUTTON_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_LINE_METRIC_TAG))
         self.assertTrue(dpg.does_item_exist(dataAnalyticsWindow.REVENUE_TIME_BAR_METRIC_TAG))
@@ -239,7 +246,6 @@ class TestMainWindowUI(GuiDbTestCase):
             dataAnalyticsWindow.CUSTOMER_PRODUCT_GENDER_TABLE_TAG
         )
         section_rows = _get_row_values(dataAnalyticsWindow.SECTION_TIME_TABLE_TAG)
-        estimator_rows = _get_row_values(dataAnalyticsWindow.CUSTOMER_ATTRIBUTES_TABLE_TAG)
         basket_summary_rows = _get_row_values(dataAnalyticsWindow.BASKET_SUMMARY_TABLE_TAG)
         basket_product_rows = _get_row_values(dataAnalyticsWindow.BASKET_PRODUCTS_TABLE_TAG)
         basket_pair_rows = _get_row_values(dataAnalyticsWindow.BASKET_PAIRS_TABLE_TAG)
@@ -258,8 +264,6 @@ class TestMainWindowUI(GuiDbTestCase):
             ],
             section_rows,
         )
-        self.assertIn(["Age Range", "(25-32)"], estimator_rows)
-        self.assertIn(["Gender Label", "Female"], estimator_rows)
         self.assertIn(
             [
                 str(store.store_id),
