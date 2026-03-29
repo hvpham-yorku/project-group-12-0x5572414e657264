@@ -85,25 +85,41 @@ class SimulationRenderResult:
     video_seconds: float
 
 
+def _safe_stat(path: str):
+    try:
+        return os.stat(path)
+    except (FileNotFoundError, PermissionError, OSError):
+        return None
+
+
 def get_simulation_overview() -> SimulationOverview:
     """Return simulation settings and current output-file metadata."""
     candidate_paths = [
         os.path.abspath(OUTPUT_FILE),
         os.path.abspath(OUTPUT_FILE.replace(".mp4", ".avi")),
     ]
-    existing_paths = [path for path in candidate_paths if os.path.exists(path)]
+    existing_paths = []
+    path_stats = {}
+    for path in candidate_paths:
+        stat_result = _safe_stat(path)
+        if stat_result is None:
+            continue
+        existing_paths.append(path)
+        path_stats[path] = stat_result
+
     output_path = (
-        max(existing_paths, key=os.path.getmtime)
+        max(existing_paths, key=lambda path: path_stats[path].st_mtime)
         if existing_paths
         else candidate_paths[0]
     )
-    output_exists = os.path.exists(output_path)
-    output_size_bytes = os.path.getsize(output_path) if output_exists else 0
+    output_stat = path_stats.get(output_path) or _safe_stat(output_path)
+    output_exists = output_stat is not None
+    output_size_bytes = output_stat.st_size if output_stat is not None else 0
     output_modified_at = ""
-    if output_exists:
-        output_modified_at = datetime.fromtimestamp(
-            os.path.getmtime(output_path)
-        ).strftime("%Y-%m-%d %H:%M:%S")
+    if output_stat is not None:
+        output_modified_at = datetime.fromtimestamp(output_stat.st_mtime).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
     return SimulationOverview(
         output_file=os.path.basename(output_path),
@@ -396,8 +412,6 @@ def render_simulation(progress_callback=None) -> SimulationRenderResult:
     writer.release()
     output_path = os.path.abspath(output_file)
     temp_output_path = os.path.abspath(temp_output_file)
-    if os.path.exists(output_path):
-        os.remove(output_path)
     _emit_progress(progress_callback, 0.99, "Finalizing the simulation video output...")
     os.replace(temp_output_path, output_path)
     alt_output_path = os.path.abspath(
